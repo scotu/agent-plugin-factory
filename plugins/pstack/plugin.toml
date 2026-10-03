@@ -4,5 +4,5 @@ path = "pstack"
 ref = "main"
 
 [targets.hermes]
-build_repo = "git@github.com:scotu/pstack-hermes-build.git"
+build_repo = "git@github.com:scotu/pstack-hermes.git"
 plugin_key = "pstack"
