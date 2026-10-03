@@ -1101,7 +1101,7 @@ rep("autopilot-stack.md",
 EOF
 ```
 
-- [ ] **Step 5: Run the whole suite and confirm it passes.** Run `python3 -m unittest discover -s tests -v`. Expected: all OK, which is 31 tests: 8 in `test_skills`, 9 in `test_check_plan`, 11 in `test_audit_watch`, plus the 3 added in this task.
+- [ ] **Step 5: Run the whole suite and confirm it passes.** Run `python3 -m unittest discover -s tests -v`. Expected: all OK, which is 28 tests: 8 in `test_skills`, 9 in `test_check_plan`, 11 in `test_audit_watch`. Those counts include the 4 tests added in this task.
 
 - [ ] **Step 6: Append the ledger entry:**
 
@@ -1128,7 +1128,7 @@ git commit -m "C-005: playbooks arm the split audit tick; check-plan accepts pst
 
 **Files:** none changed. This task releases and verifies.
 
-- [ ] **Step 1: Run the whole suite and the ledger checks.** Run `python3 -m unittest discover -s tests -v`. Expected: 31 tests OK. Then run `grep -c "Ten lanes" skills/poteto-mode/playbooks/multi-phase-plan.md`. Expected: `1`.
+- [ ] **Step 1: Run the whole suite and the ledger checks.** Run `python3 -m unittest discover -s tests -v`. Expected: 28 tests OK. Then run `grep -c "Ten lanes" skills/poteto-mode/playbooks/multi-phase-plan.md`. Expected: `1`.
 
 - [ ] **Step 2: Validate the plugin.** Run `hermes plugins validate /Users/matteo/Development/agents/agent-plugin-factory/builds/hermes/pstack 2>&1 | tail -15`.
   - Expected: no manifest or skill-format errors.
