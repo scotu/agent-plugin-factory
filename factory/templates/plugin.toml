@@ -1,0 +1,8 @@
+[upstream]
+repo = "{{REPO}}"
+path = "{{PATH}}"
+ref = "main"
+
+[targets.{{TARGET}}]
+build_repo = "{{REMOTE}}"
+plugin_key = "{{NAME}}"
