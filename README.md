@@ -1,54 +1,75 @@
-# pstack for Hermes
+# agent-plugin-factory
 
-This builds upstream [pstack](https://github.com/cursor/plugins/tree/main/pstack) into a Hermes portable plugin (Agent Plugins v1). It replaces the cut-down catalog port: that port has 6 skills and about 34 KB of text, while this build has all 47 skills and about 400 KB.
+Builds upstream agent plugins for the agents we use, with personal customizations that survive upstream updates. For now the only target is [Hermes](https://hermes-agent.nousresearch.com/).
 
-```
-git clone git@github.com:scotu/pstack-hermes.git && cd pstack-hermes
-python3 sync.py [git-ref] [--install]   # default: main → build/pstack (its own git repo)
-hermes -p <profile> plugins install file://$PWD/build/pstack --enable   # first time
-hermes -p <profile> plugins update pstack     # after a re-sync (or pass --install above)
-```
+| Plugin | Upstream | Build repo |
+|---|---|---|
+| pstack | [cursor/plugins/pstack](https://github.com/cursor/plugins/tree/main/pstack) | [scotu/pstack-hermes](https://github.com/scotu/pstack-hermes) |
 
-## Personal fork
+## How it works
 
-`build/pstack` is not part of this repo. It is a clone of [scotu/pstack-hermes-build](https://github.com/scotu/pstack-hermes-build), and `sync.py` clones it on first run, fast-forwards it from GitHub before each build, and pushes both branches after each successful merge. Hermes installs from the local clone (`file://…/build/pstack`).
+Each plugin and target has its own **build repo**, `scotu/<plugin>-<target>`. It is a standalone plugin that you can install directly. It has two branches:
 
-It has two branches:
-
-- **`upstream`** is the exact output of `sync.py`. Never edit it by hand.
+- **`upstream`** is the exact build output: the upstream tree run through the plugin's port hook. `UPSTREAM` records the upstream commit, and `FACTORY` records the factory commit that built it. Never edit it by hand.
 - **`main`** is `upstream` plus personal changes. Hermes installs this branch.
 
-Each personal change is a commit on `main` named `C-NNN: …`. It has a matching entry in `build/pstack/CUSTOMIZATIONS.md` that records the intent, the reason, the files it touches, and a check that it still holds. `git -C build/pstack diff upstream main --` shows the whole fork.
+Each personal change is a `C-NNN: …` commit on `main`, with an entry in that repo's `CUSTOMIZATIONS.md`: the intent, the reason, the files it touches, and how to check it. `git diff refs/heads/upstream main --` shows the whole fork.
 
-`sync.py` commits the new build to `upstream` and then merges it into `main`, with git rerere enabled. Then:
+`python3 -m factory sync <plugin>` does the following:
+1. Fetches upstream and clones or fast-forwards the build repo into `builds/<target>/<plugin>/` (gitignored).
+2. Runs the port hook into `upstream` and commits.
+3. Lists the ledger entries whose files upstream changed, so you can check whether upstream now covers them.
+4. Merges into `main`, with git rerere on, and pushes both branches.
 
-- **Conflict:** the script stops and lists the conflicted files. Re-apply each affected entry's intent, commit, and re-run with `--install`.
-- **Merge succeeded:** the script lists the active entries whose files upstream changed. Review each one. If upstream now covers it, mark it `retired`.
+On a conflict it stops without pushing. Re-apply each affected entry's intent, commit in the build clone, and run `sync` again.
 
-Never rebase or reset `main`. `hermes plugins update` pulls with `--ff-only`, so a rewritten `main` breaks every installed profile.
+Never rebase or reset `main` in a build repo. `hermes plugins update` pulls with `--ff-only`.
 
-## What the build changes
+## Commands
 
-Upstream text is copied verbatim, except for these changes:
+```
+python3 -m factory sync <plugin> [--ref <git-ref>] [--install]   # --install: update Hermes profiles using the build clone
+python3 -m factory status [<plugin>]
+python3 -m factory new <plugin> --upstream <git-url>[#subdir]     # creates plugins/<plugin>/ and scotu/<plugin>-hermes
+python3 -m unittest discover -s tests -v
+```
 
-1. **Manifest.** A root `plugin.json` (Agent Plugins v1) replaces `.cursor-plugin/plugin.json`. Its version is `<upstream>+hermes.<sha>`, and `UPSTREAM` records the exact commit.
+First install into a Hermes profile:
+```
+hermes -p <profile> plugins install file://$PWD/builds/hermes/<plugin> --enable
+```
+
+## Adding a plugin
+
+1. Run `python3 -m factory new <name> --upstream <git-url>#<subdir>`. It writes `plugins/<name>/plugin.toml` and a stub `plugins/<name>/hermes/port.py`, which copies the tree as is. It also creates the public build repo.
+2. Write the port hook, `port(src, out, ctx)`:
+   - `src` is the upstream subtree and `out` is the empty build folder.
+   - `ctx.here` is the hook's own folder, so overlay files can live next to it.
+   - `ctx.upstream_sha` is the upstream commit. You can set `ctx.version`, which appears in commit messages.
+   - The output must contain `plugin.json`.
+3. Run `python3 -m factory sync <name>`, then install it.
+
+## pstack on Hermes
+
+`plugins/pstack/hermes/port.py` makes these changes to the upstream text:
+
+1. **Manifest.** A root `plugin.json` (Agent Plugins v1) replaces `.cursor-plugin/plugin.json`. Its version is `<upstream>+hermes.<sha>`.
 2. **Names.** Each `SKILL.md` `name:` is set to its directory name, which Hermes requires. This fixes `poteto-mode`.
 3. **Pointer.** A one-line pointer to the `pstack-on-hermes` skill is added after every skill's frontmatter.
-4. **Overlay** (`overlay/skills/`):
-   - `pstack-on-hermes` maps Cursor to Hermes: `Task`/`subagent_type` become `delegate_task`, model roles become `pstack-models.md`, `AskQuestion` becomes `clarify`, `/loop` stays `/loop`, cloud agents become worktrees, `cursor-team-kit` gets substitutes, and transcripts become sessions. Upstream `agents/*.md` ship as its `references/`.
-   - `setup-pstack` is replaced by a Hermes version that sets `delegation.model` and writes `pstack-models.md` (roles map to `parent` | `delegate` | `profile:<name>`).
-5. **Dropped:** `make-bot-ui`, which is platform-specific; dr-eggbot ships its own Hermes version. Also dropped: `automations/benny` (a Cursor Slack automation kit), the docs, and the assets.
+4. **Overlay** (`plugins/pstack/hermes/overlay/skills/`):
+   - `pstack-on-hermes` maps Cursor to Hermes: `Task`/`subagent_type` become `delegate_task`, model roles become `pstack-models.md`, `AskQuestion` becomes `clarify`, cloud agents become worktrees, and transcripts become sessions. Upstream `agents/*.md` ship as its `references/`.
+   - `setup-pstack` is replaced by a Hermes version that sets `delegation.model` and writes `pstack-models.md`.
+5. **Dropped:** `make-bot-ui` (dr-eggbot ships its own), `automations/`, the docs, and the assets.
 
-Skills resolve only under their namespaced name, `agent-plugin-pstack-7171b73f:<name>`. The prefix is `sha256("pstack")[:8]`, so it is the same on every install. `sync.py` writes it into the pointer and the overlay.
+Skills resolve only under their namespaced name, `agent-plugin-pstack-7171b73f:<name>`.
 
-## Known limits on Hermes
-
-- **Models.** There is no per-subagent model. Every `delegate_task` child uses the profile's `delegation.model`. The only way to get a different model family in a panel is a `profile:<name>` entry (via `message_agent`, which is async).
-- **Named agents.** Named Cursor agents (`poteto-agent`, `comment-sicko`) become delegated tasks with their text as context.
-- **Missing Cursor pieces.** Cursor cloud agents and `cursor-team-kit` (`deslop`, `control-ui`, `control-cli`) have no Hermes equivalent. The shim names the substitutes: worktrees, `unslop`, browser tools, and the terminal.
-- **Invocation flags.** `disable-model-invocation` is ignored by Hermes, so the model can load every skill.
-- **Scripts.** `poteto-mode/scripts` need `bun`, `node`, and `gh`. Run `bun install` in the installed copy before first use.
+Known limits:
+- There is no per-subagent model on Hermes.
+- Named Cursor agents become delegated tasks.
+- Cursor cloud agents and `cursor-team-kit` have no Hermes equivalent.
+- `disable-model-invocation` is ignored.
+- `poteto-mode/scripts` need `bun`, `node` and `gh`.
 
 ## License
 
-MIT. Upstream pstack is MIT, Copyright (c) 2026 Lauren Tan. See `LICENSE`.
+MIT. pstack is MIT, Copyright (c) 2026 Lauren Tan. See `LICENSE`.

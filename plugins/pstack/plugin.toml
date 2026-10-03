@@ -1,0 +1,8 @@
+[upstream]
+repo = "https://github.com/cursor/plugins"
+path = "pstack"
+ref = "main"
+
+[targets.hermes]
+build_repo = "git@github.com:scotu/pstack-hermes-build.git"
+plugin_key = "pstack"

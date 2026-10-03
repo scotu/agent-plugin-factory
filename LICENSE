@@ -22,5 +22,5 @@ SOFTWARE.
 
 ---
 
-Parts of overlay/ adapt text from pstack (https://github.com/cursor/plugins/tree/main/pstack),
+Parts of plugins/pstack/hermes/overlay/ adapt text from pstack (https://github.com/cursor/plugins/tree/main/pstack),
 used under the MIT License, Copyright (c) 2026 Lauren Tan.
