@@ -165,7 +165,7 @@ C-001 owns `skills/pstack-economy/SKILL.md`, and C-005 owns `skills/pstack-econo
 
 ## Testing
 
-1. **`check-plan.mjs`:** sample plans in a temp dir. A plan with "Ten lanes" passes. A plan with "One lane per distinct check … (5 lanes)" passes. A plan with neither fails. A program plan without `/loop 1h` passes. The script's existing behavior otherwise stays unchanged. If the script has its own tests, run them.
+1. **`check-plan.mjs`:** sample plans in a temp dir. A plan with "Ten lanes" passes. A plan with "One lane per distinct check … (5 lanes)" passes. A plan with neither fails. A program plan with `pstack-audit-` and no `/loop 1h` passes, and one with neither marker still fails. The script's existing behavior otherwise stays unchanged. If the script has its own tests, run them.
 2. **Watcher script:** unittest against temp git repos and a fake `owners.tsv`, with `gh` replaced by a stub script on `PATH`. Check that:
    - the output is identical across two runs with no changes, with no timestamps;
    - a new push changes only that owner's SHA field;
