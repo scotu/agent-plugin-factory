@@ -70,6 +70,10 @@ Known limits:
 - `disable-model-invocation` is ignored.
 - `poteto-mode/scripts` need `bun`, `node` and `gh`.
 
+## Known issues
+
+Known limitations are tracked as [GitHub issues labeled `known-issue`](https://github.com/scotu/agent-plugin-factory/issues?q=is%3Aissue+is%3Aopen+label%3Aknown-issue). List them with `gh issue list --label known-issue`, and close them from commits with `Fixes #N`.
+
 ## License
 
 MIT. pstack is MIT, Copyright (c) 2026 Lauren Tan. See `LICENSE`.
