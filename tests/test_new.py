@@ -33,6 +33,20 @@ class NewTest(unittest.TestCase):
             from factory.new import new
             new(self.sb.root, "demo", "hermes", "x#y", self.sb.remote.as_uri())
 
+    def test_failed_push_leaves_nothing_behind_and_can_be_rerun(self):
+        from factory.gitutil import GitError
+        from factory.new import clone_path, new
+        bad = (self.sb.root.parent / "missing.git").as_uri()
+        with self.assertRaises(GitError):
+            new(self.sb.root, "two", "hermes", "x#y", bad)
+        self.assertFalse((self.sb.root / "plugins" / "two").exists())
+        self.assertFalse(clone_path(self.sb.root, "two", "hermes").exists())
+        good = self.sb.root.parent / "two.git"
+        good.mkdir()
+        git(good, "init", "-q", "--bare", "-b", "main")
+        new(self.sb.root, "two", "hermes", "x#y", good.as_uri())
+        self.assertTrue((self.sb.root / "plugins" / "two" / "plugin.toml").exists())
+
     def test_fetch_checks_out_only_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "u"

@@ -1,4 +1,5 @@
 """Create a plugin folder from templates and its build repo (upstream: empty init commit; main: ledger + README)."""
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -24,27 +25,14 @@ def _fill(template: str, **values: str) -> str:
     return text
 
 
-def _gh(*args: str) -> None:
-    subprocess.run(["gh", *args], check=True, capture_output=True, text=True)
+def _gh(*args: str) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(["gh", *args], check=True, capture_output=True, text=True)
+    except FileNotFoundError:
+        raise ConfigError("the GitHub CLI `gh` is not installed; pass --remote with an existing empty repo") from None
 
 
-def new(root: Path, name: str, target: str, upstream_spec: str, remote: str, *,
-        github_repo: str | None = None, public: bool = True) -> Path:
-    plugin_dir = root / "plugins" / name
-    clone = clone_path(root, name, target)
-    for path in (plugin_dir, clone):
-        if path.exists():
-            raise ConfigError(f"{path} already exists")
-    repo, _, sub = upstream_spec.partition("#")
-    values = dict(name=name, target=target, repo=repo, path=sub.strip("/"), remote=remote)
-
-    (plugin_dir / target).mkdir(parents=True)
-    (plugin_dir / "plugin.toml").write_text(_fill("plugin.toml", **values))
-    (plugin_dir / target / "port.py").write_text(_fill("port.py", **values))
-
-    if github_repo:
-        _gh("repo", "create", github_repo, "--public" if public else "--private",
-            "--description", f"{name} built for {target} by agent-plugin-factory")
+def _init_build_repo(clone: Path, remote: str, values: dict) -> None:
     clone.mkdir(parents=True)
     git(clone, "init", "-q", "-b", "upstream")
     git(clone, "commit", "-q", "--allow-empty", "-m", "init")
@@ -55,6 +43,35 @@ def new(root: Path, name: str, target: str, upstream_spec: str, remote: str, *,
     git(clone, "commit", "-q", "-m", "C-000: add customization ledger")
     git(clone, "remote", "add", "origin", remote)
     git(clone, "push", "-q", "-u", "origin", "main", "upstream")
+
+
+def new(root: Path, name: str, target: str, upstream_spec: str, remote: str, *,
+        github_repo: str | None = None, public: bool = True) -> Path:
+    """Create the build repo first and the plugin folder last, so a failure leaves nothing local behind
+    and the command can simply be run again (an existing GitHub repo is reused)."""
+    plugin_dir = root / "plugins" / name
+    clone = clone_path(root, name, target)
+    for path in (plugin_dir, clone):
+        if path.exists():
+            raise ConfigError(f"{path} already exists")
+    repo, _, sub = upstream_spec.partition("#")
+    values = dict(name=name, target=target, repo=repo, path=sub.strip("/"), remote=remote)
+
+    if github_repo:
+        try:
+            _gh("repo", "view", github_repo)
+        except subprocess.CalledProcessError:
+            _gh("repo", "create", github_repo, "--public" if public else "--private",
+                "--description", f"{name} built for {target} by agent-plugin-factory")
+    try:
+        _init_build_repo(clone, remote, values)
+    except BaseException:
+        shutil.rmtree(clone, ignore_errors=True)
+        raise
     if github_repo:
         _gh("repo", "edit", github_repo, "--default-branch", "main")
+
+    (plugin_dir / target).mkdir(parents=True)
+    (plugin_dir / "plugin.toml").write_text(_fill("plugin.toml", **values))
+    (plugin_dir / target / "port.py").write_text(_fill("port.py", **values))
     return plugin_dir

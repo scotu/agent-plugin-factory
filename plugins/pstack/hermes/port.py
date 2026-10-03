@@ -26,7 +26,7 @@ def patch_skill(skill_md, pointer):
     text = skill_md.read_text()
     m = FRONTMATTER.match(text)
     if not m:
-        raise SystemExit(f"{skill_md}: no frontmatter")
+        raise RuntimeError(f"{skill_md}: no frontmatter")
     fm = re.sub(r"^name:.*$", f"name: {skill_md.parent.name}", m.group(1), count=1, flags=re.M)
     body = text[m.end():].lstrip("\n").replace("{{NS}}", NS)
     skill_md.write_text(f"---\n{fm}\n---\n\n{pointer if pointer else ''}{body}")

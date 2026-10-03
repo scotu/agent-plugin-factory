@@ -95,6 +95,20 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(git(self.sb.clone, "branch", "--show-current"), "main")
         self.assertFalse(is_dirty(self.sb.clone))
 
+    def test_system_exit_in_hook_is_rolled_back(self):
+        self.sb.write_upstream("EXIT", "x\n")
+        with self.assertRaisesRegex(build.HookError, "bye"):
+            build.sync(self.sb.root, "demo", "hermes")
+        self.assertEqual(git(self.sb.clone, "rev-parse", "refs/heads/upstream"), self.first.built)
+        self.assertEqual(git(self.sb.clone, "branch", "--show-current"), "main")
+        self.assertFalse(is_dirty(self.sb.clone))
+
+    def test_dirty_upstream_branch_gives_recovery_command(self):
+        git(self.sb.clone, "switch", "-q", "upstream")
+        (self.sb.clone / "a.txt").unlink()
+        with self.assertRaisesRegex(build.SyncError, "reset --hard"):
+            build.sync(self.sb.root, "demo", "hermes")
+
     def test_missing_manifest_fails(self):
         self.sb.write_upstream("plugin.json", "", delete=True)
         with self.assertRaisesRegex(build.HookError, "no plugin.json"):

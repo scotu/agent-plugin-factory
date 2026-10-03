@@ -12,6 +12,8 @@ COPY_HOOK = '''import shutil
 def port(src, out, ctx):
     if (src / "FAIL").exists():
         raise RuntimeError("boom")
+    if (src / "EXIT").exists():
+        raise SystemExit("bye")
     shutil.copytree(src, out, dirs_exist_ok=True)
     ctx.version = "1.0"
 '''

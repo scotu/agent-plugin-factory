@@ -66,6 +66,9 @@ def prepare(clone: Path, remote: str) -> None:
         git(clone.parent, "clone", "-q", remote, str(clone))
     git(clone, "config", "rerere.enabled", "true")
     if is_dirty(clone):
+        if git(clone, "branch", "--show-current") == "upstream":
+            raise SyncError(f"{clone} is on `upstream` with a partial build (an interrupted sync); discard it with "
+                            f"`git -C {clone} reset --hard && git -C {clone} clean -fdx && git -C {clone} switch main`")
         raise SyncError(f"{clone} has uncommitted changes or an unfinished merge; commit or resolve them first")
     git(clone, "fetch", "-q", "origin")
     if not ok(clone, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/upstream"):
@@ -101,23 +104,26 @@ def sync(root: Path, name: str, target: str, ref: str | None = None) -> SyncResu
         before = git(clone, "rev-parse", "HEAD")
         ctx = Context(name, target, here, sha, ref)
         manifest = MANIFESTS.get(target, "plugin.json")
+        # Everything from wiping the tree to the build commit is rolled back on any failure, including
+        # SystemExit from a hook and Ctrl-C, so the clone is never left on `upstream` half-built.
         try:
             _empty(clone)
             port(src, clone, ctx)
             if not (clone / manifest).exists():
                 raise HookError(f"hook produced no {manifest}")
-        except Exception as exc:
+            (clone / "UPSTREAM").write_text(f"repo: {plugin.repo}\npath: {plugin.path}\nref: {ref}\ncommit: {sha}\n")
+            (clone / "FACTORY").write_text(factory_stamp(root))
+            label = f"{name} {ctx.version}" if ctx.version else name
+            git(clone, "add", "-A")
+            if is_dirty(clone):
+                git(clone, "commit", "-q", "-m", f"{label} @ {sha[:12]}")
+        except BaseException as exc:
             git(clone, "reset", "-q", "--hard", before)
             git(clone, "clean", "-qfdx")
             git(clone, "switch", "-q", "main")
-            raise HookError(f"port hook for {name}/{target} failed: {exc}") from exc
-
-    (clone / "UPSTREAM").write_text(f"repo: {plugin.repo}\npath: {plugin.path}\nref: {ref}\ncommit: {sha}\n")
-    (clone / "FACTORY").write_text(factory_stamp(root))
-    label = f"{name} {ctx.version}" if ctx.version else name
-    git(clone, "add", "-A")
-    if is_dirty(clone):
-        git(clone, "commit", "-q", "-m", f"{label} @ {sha[:12]}")
+            if isinstance(exc, KeyboardInterrupt):
+                raise
+            raise HookError(f"build of {name}/{target} failed: {exc}") from exc
     built = git(clone, "rev-parse", "HEAD")
 
     git(clone, "switch", "-q", "main")
