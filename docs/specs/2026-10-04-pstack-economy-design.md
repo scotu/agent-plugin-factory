@@ -31,7 +31,7 @@ A fourth executor exists for scheduled work:
 - **`cron:<model>`:** a Hermes cron job pinned to any model (`hermes cron create … --model M --provider P --pin`).
   - In `--monitor-script` mode, a cheap script runs every tick, and the agent runs only when the script's output changes. Output must not contain timestamps.
   - `--deliver bot-chat:<profile>` injects the job's output into that profile's chat as a message the bot responds to.
-  - Scripts must live in `~/.hermes/scripts/`.
+  - Scripts must live in the profile's own `scripts/` folder: `~/.hermes/profiles/<profile>/scripts/`, or `~/.hermes/scripts/` for the default profile. `cron create` doesn't check that the script exists, so arming is followed by one `cron run` to confirm it works.
 
 Routing by tier therefore means choosing which executor runs a role, and choosing well which models fill the parent and delegate slots.
 
@@ -69,7 +69,7 @@ hermes -p <profile> cron create 15m "<watcher prompt>" --name pstack-audit-<prog
   --model <self-hosted model> --provider <its provider> --pin \
   --deliver bot-chat:<profile>
 ```
-- **The monitor script `pstack-audit-watch.py`** ships in `skills/pstack-economy/audit-watch/`. The root copies it into `~/.hermes/scripts/` when arming.
+- **The monitor script `pstack-audit-watch.py`** ships in `skills/pstack-economy/audit-watch/`. The root copies it into the profile's `scripts/` folder when arming, then confirms with one `cron run`.
   - It reads `owners.tsv` from the program dir, which the root maintains. Columns: owner, branch, PR, expected runtime in minutes, and started-at.
   - It prints one stable state line per owner, with no timestamps: branch head SHA, PR check state (`gh pr checks`), open bot-comment count, and `STUCK` once the owner has passed its expected runtime with no new push.
   - It needs no LLM.
