@@ -50,6 +50,18 @@ class CliTest(unittest.TestCase):
         self.assertIn("error: unknown plugin 'nope'", r.stderr)
         self.assertNotIn("Traceback", r.stderr)
 
+    def test_new_target_on_existing_plugin(self):
+        remote = self.sb.root.parent / "demo-cc.git"
+        remote.mkdir()
+        git(remote, "init", "-q", "--bare", "-b", "main")
+        r = self.cli("new", "demo", "--target", "cc", "--upstream", f"{self.sb.upstream.as_uri()}#plug2",
+                     "--remote", remote.as_uri(), "--marketplace", "mk")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        toml = (self.sb.root / "plugins" / "demo" / "plugin.toml").read_text()
+        self.assertIn('[targets.cc]', toml)
+        self.assertIn('path = "plug2"', toml)
+        self.assertIn('marketplace = "mk"', toml)
+
     def test_new_with_explicit_remote(self):
         remote = self.sb.root.parent / "two.git"
         remote.mkdir()

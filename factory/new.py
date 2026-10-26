@@ -3,6 +3,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from . import config
 from .config import ConfigError
 from .gitutil import git
 
@@ -75,3 +76,43 @@ def new(root: Path, name: str, target: str, upstream_spec: str, remote: str, *,
     (plugin_dir / "plugin.toml").write_text(_fill("plugin.toml", **values))
     (plugin_dir / target / "port.py").write_text(_fill("port.py", **values))
     return plugin_dir
+
+
+def add_target(root: Path, name: str, target: str, remote: str, *, github_repo: str | None = None,
+               public: bool = True, path: str | None = None, ref: str | None = None,
+               marketplace: str | None = None) -> Path:
+    """Give an existing plugin a new target: create its build repo, then append the target to plugin.toml and
+    write a stub port hook if the target has none. Like `new`, the build repo comes first so a failure leaves
+    the plugin folder untouched."""
+    plugin = config.load(root, name)
+    if target in plugin.targets:
+        raise ConfigError(f"plugin '{name}' already has target '{target}'")
+    clone = clone_path(root, name, target)
+    if clone.exists():
+        raise ConfigError(f"{clone} already exists")
+    values = dict(name=name, target=target, repo=plugin.repo, path=path if path is not None else plugin.path,
+                  remote=remote)
+    if github_repo:
+        try:
+            _gh("repo", "view", github_repo)
+        except subprocess.CalledProcessError:
+            _gh("repo", "create", github_repo, "--public" if public else "--private",
+                "--description", f"{name} built for {target} by agent-plugin-factory")
+    try:
+        _init_build_repo(clone, remote, values)
+    except BaseException:
+        shutil.rmtree(clone, ignore_errors=True)
+        raise
+    if github_repo:
+        _gh("repo", "edit", github_repo, "--default-branch", "main")
+
+    block = f'\n[targets.{target}]\nbuild_repo = "{remote}"\nplugin_key = "{name}"\n'
+    block += "".join(f'{key} = "{value}"\n' for key, value in
+                     (("path", path), ("ref", ref), ("marketplace", marketplace)) if value is not None)
+    toml = plugin.dir / "plugin.toml"
+    toml.write_text(toml.read_text().rstrip("\n") + "\n" + block)
+    hook = plugin.dir / target / "port.py"
+    if not hook.exists():
+        hook.parent.mkdir(parents=True, exist_ok=True)
+        hook.write_text(_fill("port.py", **values))
+    return plugin.dir

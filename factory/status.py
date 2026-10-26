@@ -11,7 +11,8 @@ def _short(clone: Path, branch: str) -> str:
     return git(clone, "rev-parse", "--short", f"refs/heads/{branch}")
 
 
-def lines(root: Path, names: list[str], profiles_dir: Path) -> list[str]:
+def lines(root: Path, names: list[str], profiles_dir: Path,
+          cc_plugins: Path = install.DEFAULT_CC_PLUGINS) -> list[str]:
     out = []
     for name in names:
         plugin = config.load(root, name)
@@ -33,7 +34,9 @@ def lines(root: Path, names: list[str], profiles_dir: Path) -> list[str]:
             text = git(clone, "show", f"refs/heads/main:{LEDGER}") \
                 if ok(clone, "cat-file", "-e", f"refs/heads/main:{LEDGER}") else ""
             active = sum(1 for e in ledger.parse(text) if e.status == "active")
-            installs = ", ".join(f"{p}@{r[:7]}" for p, r in install.installed(profiles_dir, spec.plugin_key, clone))
+            found = (install.claude_code_installed(cc_plugins, f"{spec.plugin_key}@{spec.marketplace}") if spec.marketplace
+                     else install.installed(profiles_dir, spec.plugin_key, clone))
+            installs = ", ".join(f"{p}@{r[:7]}" for p, r in found)
             out.append(f"{head}: upstream {_short(clone, 'upstream')} (from {built_from[:12] or 'nothing yet'}, "
                        f"{ahead} new upstream commits on {plugin.source(target)[1]}), main {_short(clone, 'main')}, "
                        f"{active} active customizations, installed: {installs or 'none'}")

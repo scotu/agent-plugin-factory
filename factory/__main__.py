@@ -6,7 +6,7 @@ from pathlib import Path
 
 from . import audit, build, config, install, status
 from .gitutil import GitError, git
-from .new import clone_path, default_remote, new
+from .new import add_target, clone_path, default_remote, new
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -69,6 +69,13 @@ def cmd_push(args) -> int:
 def cmd_new(args) -> int:
     github_repo = None if args.remote else f"{args.owner}/{args.plugin}-{args.target}"
     remote = args.remote or default_remote(args.owner, args.plugin, args.target)
+    if (args.root / "plugins" / args.plugin / "plugin.toml").exists():
+        # An existing plugin gets a new target; #subdir becomes that target's upstream path.
+        _, _, sub = args.upstream.partition("#")
+        plugin_dir = add_target(args.root, args.plugin, args.target, remote, github_repo=github_repo,
+                                public=not args.private, path=sub.strip("/") or None, marketplace=args.marketplace)
+        print(f"added target {args.target} to {plugin_dir} with build repo {remote}")
+        return 0
     plugin_dir = new(args.root, args.plugin, args.target, args.upstream, remote,
                      github_repo=github_repo, public=not args.private)
     print(f"created {plugin_dir} and build repo {remote}")
@@ -77,7 +84,8 @@ def cmd_new(args) -> int:
 
 
 def cmd_status(args) -> int:
-    for line in status.lines(args.root, [args.plugin] if args.plugin else config.names(args.root), args.profiles):
+    for line in status.lines(args.root, [args.plugin] if args.plugin else config.names(args.root), args.profiles,
+                             args.cc_plugins):
         print(line)
     return 0
 
@@ -86,6 +94,7 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="python3 -m factory", description=__doc__)
     p.add_argument("--root", type=Path, default=ROOT, help=argparse.SUPPRESS)
     p.add_argument("--profiles", type=Path, default=install.DEFAULT_PROFILES, help=argparse.SUPPRESS)
+    p.add_argument("--cc-plugins", type=Path, default=install.DEFAULT_CC_PLUGINS, help=argparse.SUPPRESS)
     sub = p.add_subparsers(dest="command", required=True)
 
     s = sub.add_parser("sync", help="build from upstream and merge into main, locally")
@@ -111,6 +120,7 @@ def main(argv=None) -> int:
     n.add_argument("--owner", default="scotu")
     n.add_argument("--private", action="store_true")
     n.add_argument("--remote", help="existing empty build repo URL (skips creating it on GitHub)")
+    n.add_argument("--marketplace", help="Claude Code marketplace name, for a target installed through one")
     n.set_defaults(func=cmd_new)
 
     st = sub.add_parser("status", help="show build state for every plugin")

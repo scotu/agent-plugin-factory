@@ -36,6 +36,22 @@ class InstallStatusTest(unittest.TestCase):
         (line,) = status.lines(self.sb.root, ["demo"], self.sb.profiles)
         self.assertIn("1 new upstream commits on main", line)
 
+    def test_claude_code_installed_reads_commit(self):
+        plugins_json = self.sb.profiles.parent / "installed_plugins.json"
+        self.assertEqual(install.claude_code_installed(plugins_json, "pstack@mk"), [])
+        plugins_json.write_text(json.dumps({"version": 2, "plugins": {
+            "pstack@mk": [{"scope": "user", "gitCommitSha": "abc1234def"}]}}))
+        self.assertEqual(install.claude_code_installed(plugins_json, "pstack@mk"), [("user", "abc1234def")])
+
+    def test_status_line_claude_code(self):
+        toml = self.sb.root / "plugins" / "demo" / "plugin.toml"
+        toml.write_text(toml.read_text().replace('plugin_key = "demo"', 'plugin_key = "demo"\nmarketplace = "mk"'))
+        plugins_json = self.sb.profiles.parent / "installed_plugins.json"
+        plugins_json.write_text(json.dumps({"version": 2, "plugins": {
+            "demo@mk": [{"scope": "user", "gitCommitSha": "abc1234def"}]}}))
+        (line,) = status.lines(self.sb.root, ["demo"], self.sb.profiles, plugins_json)
+        self.assertIn("installed: user@abc1234", line)
+
     def test_status_not_cloned(self):
         import shutil
         shutil.rmtree(self.sb.clone)

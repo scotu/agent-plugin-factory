@@ -15,6 +15,7 @@ class Target:
     plugin_key: str
     path: str | None = None  # upstream subdir for this target, when it differs from [upstream] path
     ref: str | None = None
+    marketplace: str | None = None  # Claude Code marketplace that installs this target's build
 
 
 @dataclass(frozen=True)
@@ -41,7 +42,7 @@ def load(root: Path, name: str) -> Plugin:
     try:
         up = data["upstream"]
         targets = {t: Target(t, v["build_repo"], v.get("plugin_key", name),
-                             v["path"].strip("/") if "path" in v else None, v.get("ref"))
+                             v["path"].strip("/") if "path" in v else None, v.get("ref"), v.get("marketplace"))
                    for t, v in data["targets"].items()}
         return Plugin(name, plugin_dir, up["repo"], up.get("path", "").strip("/"), up.get("ref", "main"), targets)
     except KeyError as exc:
