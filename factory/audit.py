@@ -76,8 +76,10 @@ def skeleton(clone: Path) -> Path:
     if path.exists():
         return path
     carried = _carried(clone, base, head)
-    rows = "".join(f"| `{p}` | {s} | {carried.get(p, (PENDING, ''))[0]} | {carried.get(p, ('', ''))[1]} |\n"
-                   for p, s in changes(clone, base, head))
+    rows = ""
+    for p, s in changes(clone, base, head):
+        verdict, note = carried.get(p, (PENDING, ""))
+        rows += f"| `{p}` | {s} | {verdict} | {note + ' ' if note else ''}|\n"
     path.parent.mkdir(exist_ok=True)
     path.write_text(f"# Upstream audit {base[:7]}..{head[:7]}\n\nFrom: {base}\nTo: {head}\n\n"
                     "Verdicts: `complies`, `n/a` (metadata, no behavior), `port` (fixed in the factory's port hook or overlay), "
