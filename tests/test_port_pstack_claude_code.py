@@ -187,6 +187,9 @@ class CodexSkillTest(unittest.TestCase):
         for needle in ("codex --version", "codex login status", "codex-companion.mjs", "codex exec"):
             self.assertIn(needle, text)
 
+    def test_default_model_means_no_flag(self):
+        self.assertIn("`codex default <effort>`", section("Available"))
+
     def test_codex_fallback_sentence(self):
         text = section("Available")
         self.assertIn("say in one line that", text)

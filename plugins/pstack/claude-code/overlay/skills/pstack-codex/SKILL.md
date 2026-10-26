@@ -20,6 +20,8 @@ Check once per session and remember the result. There are two ways to run Codex:
 
 When Codex is not available, run the seat on Claude as the adapter's Models table says, and say in one line that the step lost its second family.
 
+A role value `codex <model> <effort>` names the model. `codex default <effort>` means Codex's own configured model: pass no `--model` or `-m`, only the effort.
+
 Codex sees only the brief you give it. Put the whole task in it: the goal, the files and paths in scope, the checks to run, and the shape of the answer you expect.
 
 ## Advisory seat
