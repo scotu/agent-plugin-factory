@@ -159,7 +159,7 @@ class PortTreeTest(PortTest):
         self.run_port()
         text = (self.out / "docs" / "harness" / "claude-code.md").read_text()
         for name in ("agent's store", "`git show origin/main:pstack/<path>`", "Cursor restart", "cloud VM",
-                     "pinned", "`mcps/`", "image-generation", "inline", "Custom Mode", "Cursor Project",
+                     "Pinned", "`mcps/`", "image-generation", "inline", "Custom Mode", "Cursor Project",
                      "`/in-cloud`", "`/add-plugin`", "`allow_multiple: true`", "first `type: user` record"):
             self.assertIn(name, text)
         codex = text.split("## Codex", 1)[1]
