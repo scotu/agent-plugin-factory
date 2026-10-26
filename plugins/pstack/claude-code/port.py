@@ -7,7 +7,9 @@ The upstream tree is already a Claude Code plugin, so the port is a copy plus fo
   2. `.claude-plugin/marketplace.json` makes the build repo a one-plugin marketplace,
   3. overlay/skills/* are added and overlay/adapter-codex.md is appended to the Claude Code adapter,
   4. relative links to files outside the tree point at upstream on GitHub pinned to the built commit, and links
-     upstream already points at `main` are pinned too.
+     upstream already points at `main` are pinned too,
+  5. upstream's README.md ships as UPSTREAM-README.md (the build repo's own README.md lives on `main`), and links
+     to it follow.
 """
 import json
 import os
@@ -30,6 +32,8 @@ def relink(out, src, sha):
             if (md.parent / target).exists():
                 return m.group(0)
             rel = os.path.normpath(os.path.join(os.path.relpath(md.parent, out), target))
+            if rel == "README.md":
+                return f"]({os.path.relpath(out / 'UPSTREAM-README.md', md.parent)}{anchor})"
             if (src / rel).exists():
                 return f"]({UPSTREAM_BLOB.format(sha=sha, path=rel)}{anchor})"
             return m.group(0)  # dangling upstream too: left for tests/test_principles.py to flag
@@ -51,6 +55,8 @@ def _manifest(path, ctx):
 
 def port(src, out, ctx):
     shutil.copytree(src, out, dirs_exist_ok=True, ignore=shutil.ignore_patterns("node_modules", ".DS_Store"))
+    if (out / "README.md").exists():
+        (out / "README.md").rename(out / "UPSTREAM-README.md")
     manifest = _manifest(out / ".claude-plugin" / "plugin.json", ctx)
     if (out / "plugin.json").exists():
         _manifest(out / "plugin.json", ctx)

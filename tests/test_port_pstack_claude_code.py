@@ -61,6 +61,14 @@ class PortTest(unittest.TestCase):
         self.run_port()
         self.assertIn("name: pstack-codex", (self.out / "skills" / "pstack-codex" / "SKILL.md").read_text())
 
+    def test_upstream_readme_ships_as_upstream_readme(self):
+        (self.src / "README.md").write_text("upstream readme\n")
+        (self.src / "skills" / "a" / "SKILL.md").write_text("---\nname: a\n---\n[r](../../README.md#install)\n")
+        self.run_port()
+        self.assertFalse((self.out / "README.md").exists())
+        self.assertEqual((self.out / "UPSTREAM-README.md").read_text(), "upstream readme\n")
+        self.assertIn("(../../UPSTREAM-README.md#install)", (self.out / "skills" / "a" / "SKILL.md").read_text())
+
     def test_dropped_link_pinned(self):
         import importlib.util
         spec = importlib.util.spec_from_file_location("cc_port", HERE / "port.py")
