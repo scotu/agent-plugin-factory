@@ -1,12 +1,21 @@
 ---
 name: pstack-update
-description: Pull the latest upstream pstack into scotu/pstack-hermes, audit every upstream change against our principles, and push.
+description: Pull the latest upstream pstack into its build repos (hermes, claude-code), audit every upstream change against our principles, and push. Optional argument - the target.
 disable-model-invocation: true
 ---
 
 # pstack update
 
-Bring upstream pstack into the build repo, check every file it changed against the **Principles** and the active entries in the ledger, fix what breaks them, and publish. Run commands from the factory root unless a step says the build clone. The build clone is `builds/hermes/pstack`, and the ledger is `builds/hermes/pstack/CUSTOMIZATIONS.md`. A clean merge proves only that nothing collided. The audit is what proves the build is ours. This skill does not install. Installing is `/pstack-install`.
+Bring upstream pstack into a build repo, check every file it changed against the **Principles** and the active entries in the ledger, fix what breaks them, and publish. Run commands from the factory root unless a step says the build clone.
+
+There are two targets, each with its own build repo, ledger and port:
+
+| Target | Build clone | Port hook and overlay | Upstream folder |
+|---|---|---|---|
+| `hermes` | `builds/hermes/pstack` (`scotu/pstack-hermes`) | `plugins/pstack/hermes/` | `pstack` |
+| `claude-code` | `builds/claude-code/pstack` (`scotu/pstack-claude-code`) | `plugins/pstack/claude-code/` | `harness/pstack/claude-code` |
+
+An argument of `hermes` or `claude-code` runs one target. With no argument, run every step for `hermes`, then for `claude-code`. Add `--target <target>` to every `factory` command below. "The build clone", "the ledger" and "the port" mean that target's. A clean merge proves only that nothing collided. The audit is what proves the build is ours. This skill does not install. Installing is `/pstack-install`.
 
 ## Steps
 
@@ -32,7 +41,7 @@ Bring upstream pstack into the build repo, check every file it changed against t
      - links to a dropped file;
      - undoes a customization in other words.
    - Fix each violation where the fix will last:
-     - **P-2 mappings and dropped-file links:** fix in the factory, in `plugins/pstack/hermes/port.py` or its `overlay/`. Commit the factory change, then run step 3 again. The new audit carries over verdicts for paths that did not change.
+     - **P-2 mappings and dropped-file links:** fix in the factory, in the target's `port.py` or its `overlay/`. Commit the factory change, then run step 3 again. The new audit carries over verdicts for paths that did not change.
      - **Everything else:** a `C-NNN: …` commit on `main`. Add the file to that entry's `Touches:`, or add a new entry.
    - Write the verdict and a one-line note: `complies`, `n/a`, `port` or `C-NNN`.
 

@@ -1,10 +1,11 @@
 # agent-plugin-factory
 
-Builds upstream agent plugins for the agents we use, with personal customizations that survive upstream updates. For now the only target is [Hermes](https://hermes-agent.nousresearch.com/).
+Builds upstream agent plugins for the agents we use, with personal customizations that survive upstream updates. The targets are [Hermes](https://hermes-agent.nousresearch.com/) and Claude Code.
 
 | Plugin | Upstream | Build repo |
 |---|---|---|
 | pstack | [cursor/plugins/pstack](https://github.com/cursor/plugins/tree/main/pstack) | [scotu/pstack-hermes](https://github.com/scotu/pstack-hermes) |
+| pstack (Claude Code) | [cursor/plugins/harness/pstack/claude-code](https://github.com/cursor/plugins/tree/main/harness/pstack/claude-code) | [scotu/pstack-claude-code](https://github.com/scotu/pstack-claude-code) |
 
 ## How it works
 
@@ -32,7 +33,10 @@ python3 -m factory sync <plugin> [--ref <git-ref>]   # build and merge into main
 python3 -m factory audit <plugin>                    # write or check audits/<sha12>.md for the unpublished build
 python3 -m factory push <plugin>                     # push main and upstream; refuses an unaudited upstream build
 python3 -m factory status [<plugin>]
-python3 -m factory new <plugin> --upstream <git-url>[#subdir]     # creates plugins/<plugin>/ and scotu/<plugin>-hermes
+python3 -m factory new <plugin> --upstream <git-url>[#subdir] [--target <t>] [--marketplace <name>]
+    # a new plugin creates plugins/<plugin>/ and scotu/<plugin>-<t>; an existing one gets target <t>,
+    # whose #subdir becomes that target's upstream path
+Every command takes --target <t>; without it, sync/audit/push run each target in turn.
 python3 -m unittest discover -s tests -v
 ```
 
@@ -71,6 +75,25 @@ Known limits:
 - Cursor cloud agents and `cursor-team-kit` have no Hermes equivalent.
 - `disable-model-invocation` is ignored.
 - `poteto-mode/scripts` need `bun`, `node` and `gh`.
+
+## pstack on Claude Code
+
+The `claude-code` target builds from upstream's own Claude Code tree (`harness/pstack/claude-code`), which already maps Cursor's tools to Claude Code in `docs/harness/claude-code.md`. `plugins/pstack/claude-code/port.py` adds:
+
+1. **Marketplace.** The build repo is the marketplace `scotu-pstack`, with one plugin, `pstack` (`/pstack:<skill>`). The manifests have no `version`, so Claude Code versions each install by commit and every audited push is an update. The upstream version is in the description.
+2. **Codex.** The overlay skill `pstack-codex` runs Codex as the second model family: advisory seats read-only, and code-writing owners under `workspace-write` with a light Claude wrapper that commits, pushes and opens the PR. The adapter gains a Codex section. When Codex is available, it overrides the Models row and setup's `inherit-parent` default for non-Claude slugs.
+3. **More Cursor names.** Adapter rows for what upstream's tables leave out: the agent store, `cursor-team-kit`, `/loop`, `/create-skill`, Custom Modes, Projects, `/in-cloud`, lane VMs, `mcps/`, image generation, and installing this fork.
+4. **Tree edits.**
+   - Every skill gets the adapter pointer.
+   - `poteto-agent` learns its `${CLAUDE_PLUGIN_ROOT}` path.
+   - The guide pages and `UPSTREAM-README.md` carry a fork banner.
+   - `worktree-audit.sh` reads Claude Code transcripts. The port fails loudly if upstream moves that code.
+   - Relative links to dropped files point at upstream, pinned to the built commit.
+5. **Dropped:** `make-bot-ui` (Cursor Automations) and the root `plugin.json`, which Claude Code ignores.
+
+Customizations C-001 to C-005 on `main` mirror Hermes' economy, rewritten for two subscription families. Duplicated work mixes Claude and Codex seats, author and verifier come from different families, and the audit tick is a background watcher script (`pstack-audit-watch.py --watch`) that wakes the session only on a change.
+
+Install once with `claude plugin marketplace add scotu/pstack-claude-code` and `claude plugin install pstack@scotu-pstack --scope user`, then keep it current with `/pstack-install`.
 
 ## Known issues
 

@@ -1,14 +1,16 @@
 ---
 name: pstack-install
-description: Install the current pstack-hermes main into every Hermes profile that already has pstack.
+description: Install the current published pstack build into every place that already has it - Hermes profiles (hermes) and Claude Code (claude-code). Optional argument - the target.
 disable-model-invocation: true
 ---
 
 # pstack install
 
-Move every Hermes profile that installed pstack from the local build clone to the clone's current `main`. Run everything from the factory root. The clone is `builds/hermes/pstack`. To pull a new upstream version first, run `/pstack-update`.
+Bring every install of pstack up to its build repo's published `main`. Run everything from the factory root. An argument of `hermes` or `claude-code` limits the run to that target. With no argument, run both. To pull a new upstream version first, run `/pstack-update`.
 
-## Steps
+## Hermes
+
+Move every Hermes profile that installed pstack from the local build clone to the clone's current `main`. The clone is `builds/hermes/pstack`.
 
 1. **Refresh the clone and install only what is published.** Run `git -C builds/hermes/pstack pull --ff-only`. If the clone is missing, stop and point to `/pstack-update`. Hermes installs the clone's local `main`, so `main` must equal `origin/main`. `git -C builds/hermes/pstack rev-list --count origin/main..main` must print `0`. A higher count means an unpublished, possibly unaudited update is in progress. Stop and point to `/pstack-update`.
 2. **Find the targets.** Run `python3 -m factory status pstack`. Its `installed:` list gives each `<profile>@<rev>`. Every profile whose rev is behind `main` is a target. If none are behind, report that all profiles are current and stop.
@@ -22,3 +24,12 @@ Move every Hermes profile that installed pstack from the local build clone to th
 5. **Verify.** Done when `python3 -m factory status pstack` shows every installed profile at `main`'s short SHA, and `hermes -p <profile> plugins list` shows the new version with its enabled state unchanged. Report:
    - each profile with its old and new rev and version
    - whether a scan block was overridden, and which findings were new
+
+## Claude Code
+
+Claude Code installs pstack from the GitHub marketplace `scotu/pstack-claude-code` (marketplace name `scotu-pstack`), never from the local clone. A local-path marketplace loads its files live, which would skip the audit gate. The build has no `version`, so Claude Code versions each install by commit, and every push is an update.
+
+1. **Install only what is published.** Run `git -C builds/claude-code/pstack fetch -q`. `git -C builds/claude-code/pstack rev-list --count origin/main..main` must print `0`. Otherwise, stop and point to `/pstack-update`.
+2. **First install.** If `python3 -m factory status pstack` shows `installed: none` for `claude-code`, ask the user before installing. On yes, run `claude plugin marketplace add scotu/pstack-claude-code`, then `claude plugin install pstack@scotu-pstack --scope user`.
+3. **Update.** Run `claude plugin marketplace update scotu-pstack`, then `claude plugin update pstack@scotu-pstack`.
+4. **Verify.** Done when `python3 -m factory status pstack` shows `installed: user@<origin/main sha7>` for `claude-code`; it reads `gitCommitSha` from `~/.claude/plugins/installed_plugins.json`. Tell the user that open sessions keep the old copy until `/reload-plugins` or a restart.
