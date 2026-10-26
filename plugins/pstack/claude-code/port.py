@@ -5,7 +5,8 @@ The upstream tree is already a Claude Code plugin, so the port is a copy plus fo
   1. the manifests drop `version`, so Claude Code versions each install by commit, and the upstream version moves
      into the description,
   2. `.claude-plugin/marketplace.json` makes the build repo a one-plugin marketplace,
-  3. overlay/skills/* are added and overlay/adapter-codex.md is appended to the Claude Code adapter,
+  3. overlay/skills/* are added, and overlay/adapter-more.md (Cursor names upstream's adapter leaves out) and
+     overlay/adapter-codex.md are appended to the Claude Code adapter,
   4. relative links to files outside the tree point at upstream on GitHub pinned to the built commit, and links
      upstream already points at `main` are pinned too,
   5. upstream's README.md ships as UPSTREAM-README.md (the build repo's own README.md lives on `main`), and links
@@ -71,6 +72,7 @@ def port(src, out, ctx):
             shutil.rmtree(out / "skills" / skill.name, ignore_errors=True)
             shutil.copytree(skill, out / "skills" / skill.name)
     adapter = out / ADAPTER
-    adapter.write_text(adapter.read_text().rstrip("\n") + "\n\n" + (ctx.here / "overlay" / "adapter-codex.md").read_text())
+    extra = "\n".join((ctx.here / "overlay" / name).read_text() for name in ("adapter-more.md", "adapter-codex.md"))
+    adapter.write_text(adapter.read_text().rstrip("\n") + "\n\n" + extra)
 
     relink(out, src, ctx.upstream_sha)

@@ -57,6 +57,15 @@ class PortTest(unittest.TestCase):
         self.assertTrue(text.startswith("# pstack in Claude Code\n\nupstream adapter\n"))
         self.assertIn("## Codex", text)
 
+    def test_adapter_maps_names_upstream_leaves_out(self):
+        self.run_port()
+        text = (self.out / "docs" / "harness" / "claude-code.md").read_text()
+        self.assertIn("## More Cursor names", text)
+        for name in ("`cursor-team-kit`", "`deslop`", "`control-ui`", "`control-cli`", "`/create-skill`", "`/loop`",
+                     "`/visualize`", "`/orchestrate`"):
+            self.assertIn(name, text)
+        self.assertLess(text.index("## More Cursor names"), text.index("## Codex"))
+
     def test_overlay_skill_present(self):
         self.run_port()
         self.assertIn("name: pstack-codex", (self.out / "skills" / "pstack-codex" / "SKILL.md").read_text())
