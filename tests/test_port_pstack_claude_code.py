@@ -78,3 +78,40 @@ class PortTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+SKILL = HERE / "overlay" / "skills" / "pstack-codex" / "SKILL.md"
+
+
+def section(heading: str) -> str:
+    text = SKILL.read_text()
+    start = text.index(f"## {heading}\n")
+    nxt = text.find("\n## ", start + 1)
+    return text[start:] if nxt == -1 else text[start:nxt]
+
+
+class CodexSkillTest(unittest.TestCase):
+    def test_sections(self):
+        for heading in ("Available", "Advisory seat", "Code-writing owner", "Wrapper loop", "Standing down", "Limits"):
+            self.assertIn(f"\n## {heading}\n", SKILL.read_text())
+
+    def test_codex_available_checks(self):
+        text = section("Available")
+        for needle in ("codex --version", "codex login status", "codex-companion.mjs", "codex exec"):
+            self.assertIn(needle, text)
+
+    def test_codex_fallback_sentence(self):
+        text = section("Available")
+        self.assertIn("say in one line that", text)
+        self.assertIn("Claude", text)
+
+    def test_wrapper_owns_git(self):
+        owner = section("Code-writing owner") + section("Wrapper loop")
+        for needle in ("workspace-write", "git worktree add", "commits", "push", "gh pr create", "--cwd"):
+            self.assertIn(needle, owner)
+        self.assertIn("does not commit, push, or reach the network", section("Limits"))
+
+    def test_advisory_is_read_only(self):
+        text = section("Advisory seat")
+        self.assertIn("without `--write`", text)
+        self.assertIn("-s read-only", text)
