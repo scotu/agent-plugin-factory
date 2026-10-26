@@ -10,7 +10,7 @@ from . import audit, config, ledger, upstream
 from .gitutil import git, has_branch, is_dirty, ok, run
 from .new import LEDGER, clone_path
 
-MANIFESTS = {"hermes": "plugin.json"}
+MANIFESTS = {"hermes": "plugin.json", "claude-code": ".claude-plugin/plugin.json"}
 
 
 class SyncError(RuntimeError):

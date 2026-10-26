@@ -220,6 +220,9 @@ class SyncTest(unittest.TestCase):
         self.assertEqual((clone / "a.txt").read_text(), "from plug2\n")
         self.assertIn("path: plug2", (clone / "UPSTREAM").read_text())
 
+    def test_claude_code_target_checks_its_own_manifest(self):
+        self.assertEqual(build.MANIFESTS["claude-code"], ".claude-plugin/plugin.json")
+
     def test_unknown_target(self):
         with self.assertRaisesRegex(config.ConfigError, "no target 'codex'"):
             build.sync(self.sb.root, "demo", "codex")
