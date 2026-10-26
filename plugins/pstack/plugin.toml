@@ -6,3 +6,9 @@ ref = "main"
 [targets.hermes]
 build_repo = "git@github.com:scotu/pstack-hermes.git"
 plugin_key = "pstack"
+
+[targets.claude-code]
+build_repo = "git@github.com:scotu/pstack-claude-code.git"
+plugin_key = "pstack"
+path = "harness/pstack/claude-code"
+marketplace = "scotu-pstack"
