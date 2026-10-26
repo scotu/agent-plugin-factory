@@ -160,7 +160,7 @@ class PortTreeTest(PortTest):
         text = (self.out / "docs" / "harness" / "claude-code.md").read_text()
         for name in ("agent's store", "`git show origin/main:pstack/<path>`", "Cursor restart", "cloud VM",
                      "Pinned", "`mcps/`", "image-generation", "inline", "Custom Mode", "Cursor Project",
-                     "`/in-cloud`", "`/add-plugin pstack`", "`allow_multiple: true`", "first `type: user` record"):
+                     "`/in-cloud`", "`/add-plugin pstack`", "`/make-bot-ui`", "`allow_multiple: true`", "first `type: user` record"):
             self.assertIn(name, text)
         codex = text.split("## Codex", 1)[1]
         self.assertIn("overrides the Models row", codex)

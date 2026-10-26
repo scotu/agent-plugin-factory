@@ -29,3 +29,4 @@ Upstream's tables above leave these out.
 | A Cursor Project (one persistent coordinator thread) | One long-lived Claude Code session per program, with worktree subagents. |
 | `/in-cloud` | `isolation: "worktree"` on the `Agent` call. |
 | `/add-plugin pstack`, Customize in the sidebar, `/plugin marketplace add cursor/plugins` | `claude plugin marketplace add scotu/pstack-claude-code`, then `claude plugin install pstack@scotu-pstack`. This fork, not upstream's marketplace. |
+| `/make-bot-ui` | Not in this build. It drives Cursor Automations (routines and webhooks), which Claude Code does not have. |
