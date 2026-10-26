@@ -19,16 +19,18 @@ Each personal change is a `C-NNN: …` commit on `main`, with an entry in that r
 1. Fetches upstream and clones or fast-forwards the build repo into `builds/<target>/<plugin>/` (gitignored).
 2. Runs the port hook into `upstream` and commits.
 3. Lists the ledger entries whose files upstream changed, so you can check whether upstream now covers them.
-4. Merges into `main`, with git rerere on, and pushes both branches.
+4. Merges into `main` locally, with git rerere on. On a conflict it stops. Re-apply each affected entry's intent and commit in the build clone.
 
-On a conflict it stops without pushing. Re-apply each affected entry's intent, commit in the build clone, and run `sync` again.
+Nothing is published until it is audited. A clean merge only means no customization collided with upstream. New or reworded upstream text can still contradict the **Principles** in the build repo's `CUSTOMIZATIONS.md`. `python3 -m factory audit <plugin>` writes `audits/<upstream sha12>.md` on `main`, with one row for every path changed since the last published upstream build. Each row gets a verdict: `complies`, `n/a`, or the `C-NNN` entry it was changed under. `python3 -m factory push <plugin>` pushes both branches only when that file is committed and complete. Customization commits with no new upstream build push without an audit.
 
 Never rebase or reset `main` in a build repo. `hermes plugins update` pulls with `--ff-only`.
 
 ## Commands
 
 ```
-python3 -m factory sync <plugin> [--ref <git-ref>] [--install]   # --install: update Hermes profiles using the build clone
+python3 -m factory sync <plugin> [--ref <git-ref>]   # build and merge into main, locally
+python3 -m factory audit <plugin>                    # write or check audits/<sha12>.md for the unpublished build
+python3 -m factory push <plugin>                     # push main and upstream; refuses an unaudited upstream build
 python3 -m factory status [<plugin>]
 python3 -m factory new <plugin> --upstream <git-url>[#subdir]     # creates plugins/<plugin>/ and scotu/<plugin>-hermes
 python3 -m unittest discover -s tests -v
@@ -47,7 +49,7 @@ hermes -p <profile> plugins install file://$PWD/builds/hermes/<plugin> --enable
    - `ctx.here` is the hook's own folder, so overlay files can live next to it.
    - `ctx.upstream_sha` is the upstream commit. You can set `ctx.version`, which appears in commit messages.
    - The output must contain `plugin.json`.
-3. Run `python3 -m factory sync <name>`, then install it.
+3. Run `python3 -m factory sync <name>`, audit the whole tree, `push`, then install it.
 
 ## pstack on Hermes
 

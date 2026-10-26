@@ -4,9 +4,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import build, config, install, status
-from .gitutil import GitError
-from .new import default_remote, new
+from . import audit, build, config, install, status
+from .gitutil import GitError, git
+from .new import clone_path, default_remote, new
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -26,13 +26,44 @@ def cmd_sync(args) -> int:
             print(f"  Re-apply each affected entry's Intent from {build.LEDGER}, commit, then run sync again.")
             code = 1
             continue
-        print(f"  main {r.main[:7]}, " + ("pushed" if r.pushed else f"NOT pushed: {r.push_error}"))
-        if not r.pushed:
-            code = 1
-        if args.install and target == "hermes":
-            for profile in install.update(args.profiles, plugin.targets[target].plugin_key, r.clone):
-                print(f"  updated profile {profile}")
+        print(f"  main {r.main[:7]}, merged locally, not pushed")
+        if r.audit_needed:
+            print(f"  next: `audit {args.plugin}`, give every row a verdict, commit it on main, then `push {args.plugin}`")
+        else:
+            print(f"  next: `push {args.plugin}` (no new upstream build to audit)")
     return code
+
+
+def _targets(args) -> list[str]:
+    return [args.target] if args.target else list(config.load(args.root, args.plugin).targets)
+
+
+def cmd_audit(args) -> int:
+    code = 0
+    for target in _targets(args):
+        clone = clone_path(args.root, args.plugin, target)
+        head = f"{args.plugin}/{target}"
+        if not audit.needed(clone):
+            print(f"{head}: upstream build already published; nothing to audit")
+            continue
+        path = audit.skeleton(clone)
+        c = audit.check(clone)
+        rows = len(audit.changes(clone, audit.published(clone), git(clone, "rev-parse", "refs/heads/upstream")))
+        if c.complete:
+            print(f"{head}: {path} complete ({rows} paths)")
+        else:
+            state = "not committed on main" if not c.found else \
+                f"{len(c.pending)} without verdict, {len(c.missing)} without row, {len(c.extra)} out of range"
+            print(f"{head}: {path} ({rows} paths): {state}")
+            code = 1
+    return code
+
+
+def cmd_push(args) -> int:
+    for target in _targets(args):
+        c = build.push(args.root, args.plugin, target)
+        print(f"{args.plugin}/{target}: pushed" + (f" with audit {c.path.name}" if c else ""))
+    return 0
 
 
 def cmd_new(args) -> int:
@@ -57,12 +88,21 @@ def main(argv=None) -> int:
     p.add_argument("--profiles", type=Path, default=install.DEFAULT_PROFILES, help=argparse.SUPPRESS)
     sub = p.add_subparsers(dest="command", required=True)
 
-    s = sub.add_parser("sync", help="build from upstream, merge into main, push")
+    s = sub.add_parser("sync", help="build from upstream and merge into main, locally")
     s.add_argument("plugin")
     s.add_argument("--target")
     s.add_argument("--ref", help="upstream git ref (default: plugin.toml ref)")
-    s.add_argument("--install", action="store_true", help="update Hermes profiles installed from the build clone")
     s.set_defaults(func=cmd_sync)
+
+    a = sub.add_parser("audit", help="write or check the audit of the unpublished upstream build")
+    a.add_argument("plugin")
+    a.add_argument("--target")
+    a.set_defaults(func=cmd_audit)
+
+    pu = sub.add_parser("push", help="push main and upstream; a new upstream build needs a complete audit")
+    pu.add_argument("plugin")
+    pu.add_argument("--target")
+    pu.set_defaults(func=cmd_push)
 
     n = sub.add_parser("new", help="create a plugin folder and its build repo")
     n.add_argument("plugin")

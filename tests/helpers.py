@@ -3,6 +3,7 @@ a factory root with plugin `demo` (target `hermes`) created through `new`, and a
 import tempfile
 from pathlib import Path
 
+from factory import audit, build
 from factory.gitutil import git
 from factory.new import clone_path, new
 
@@ -56,3 +57,13 @@ class Sandbox:
 
     def cleanup(self):
         self._tmp.cleanup()
+
+
+def publish(sb: "Sandbox", verdict: str = "complies") -> None:
+    """Audit the unpublished upstream build with one verdict for every path, commit it, and push."""
+    if audit.needed(sb.clone):
+        path = audit.skeleton(sb.clone)
+        path.write_text(path.read_text().replace(f"| {audit.PENDING} |", f"| {verdict} |"))
+        git(sb.clone, "add", "-A")
+        git(sb.clone, "commit", "-q", "-m", "audit upstream build")
+    build.push(sb.root, "demo", "hermes")

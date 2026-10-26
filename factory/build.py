@@ -1,11 +1,12 @@
-"""Build one plugin for one target into its build repo's `upstream` branch, then merge into `main` and push."""
+"""Build one plugin for one target into its build repo's `upstream` branch and merge into `main`, locally.
+Publishing is `push`, which needs the new upstream build's audit (see audit.py)."""
 import importlib.util
 import shutil
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import config, ledger, upstream
+from . import audit, config, ledger, upstream
 from .gitutil import git, has_branch, is_dirty, ok, run
 from .new import LEDGER, clone_path
 
@@ -17,6 +18,10 @@ class SyncError(RuntimeError):
 
 
 class HookError(SyncError):
+    pass
+
+
+class AuditError(SyncError):
     pass
 
 
@@ -38,8 +43,7 @@ class SyncResult:
     main: str = ""
     reviews: list = field(default_factory=list)
     conflicts: list = field(default_factory=list)
-    pushed: bool = False
-    push_error: str = ""
+    audit_needed: bool = False
 
 
 def load_hook(here: Path):
@@ -137,7 +141,35 @@ def sync(root: Path, name: str, target: str, ref: str | None = None) -> SyncResu
         if not result.conflicts:
             raise SyncError(f"merge into main failed in {clone}:\n{(merge.stderr or merge.stdout).strip()}")
         return result
-    push = run(clone, "push", "-q", "origin", "main", "upstream")
-    result.pushed = push.returncode == 0
-    result.push_error = "" if result.pushed else (push.stderr or push.stdout).strip()
+    result.audit_needed = audit.needed(clone)
     return result
+
+
+def push(root: Path, name: str, target: str) -> audit.Check | None:
+    """Push `main` and `upstream`. A new upstream build goes out only with a complete audit on main."""
+    plugin = config.load(root, name)
+    if target not in plugin.targets:
+        raise config.ConfigError(f"plugin '{name}' has no target '{target}' (has: {', '.join(plugin.targets)})")
+    clone = clone_path(root, name, target)
+    if is_dirty(clone):
+        raise SyncError(f"{clone} has uncommitted changes or an unfinished merge; commit or resolve them first")
+    git(clone, "fetch", "-q", "origin")
+    if not ok(clone, "merge-base", "--is-ancestor", "refs/heads/upstream", "refs/heads/main"):
+        raise SyncError(f"main in {clone} does not contain upstream; run sync first")
+    result = None
+    if audit.needed(clone):
+        result = audit.check(clone)
+        if not result.complete:
+            raise AuditError(_audit_problem(result))
+    pushed = run(clone, "push", "-q", "origin", "main", "upstream")
+    if pushed.returncode:
+        raise SyncError(f"push failed in {clone}:\n{(pushed.stderr or pushed.stdout).strip()}")
+    return result
+
+
+def _audit_problem(c: audit.Check) -> str:
+    if not c.found:
+        return f"no committed audit {c.path.parent.name}/{c.path.name} on main; create it with `audit`, fill it, commit"
+    parts = [f"{label}: {', '.join(paths[:5])}{' …' if len(paths) > 5 else ''} ({len(paths)})"
+             for label, paths in (("no row", c.missing), ("no verdict", c.pending), ("not in range", c.extra)) if paths]
+    return f"audit {c.path.name} is incomplete; " + "; ".join(parts)
