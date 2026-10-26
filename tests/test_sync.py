@@ -192,6 +192,34 @@ class SyncTest(unittest.TestCase):
         self.assertIsNone(build.push(self.sb.root, "demo", "hermes"))
         self.assertEqual(git(self.sb.remote, "show", "refs/heads/main:a.txt"), "ONE\ntwo\nthree")
 
+    def test_target_path_builds_from_its_subdir(self):
+        (self.sb.upstream / "plug2").mkdir()
+        (self.sb.upstream / "plug2" / "plugin.json").write_text('{"name": "demo"}\n')
+        (self.sb.upstream / "plug2" / "a.txt").write_text("from plug2\n")
+        git(self.sb.upstream, "add", "-A")
+        git(self.sb.upstream, "commit", "-q", "-m", "plug2")
+        remote = self.sb.root.parent / "cc.git"
+        remote.mkdir()
+        git(remote, "init", "-q", "--bare", "-b", "main")
+        seed = self.sb.root.parent / "cc-seed"
+        seed.mkdir()
+        git(seed, "init", "-q", "-b", "upstream")
+        git(seed, "commit", "-q", "--allow-empty", "-m", "init")
+        git(seed, "switch", "-q", "-c", "main")
+        (seed / "CUSTOMIZATIONS.md").write_text("# ledger\n")
+        git(seed, "add", "-A")
+        git(seed, "commit", "-q", "-m", "C-000: ledger")
+        git(seed, "push", "-q", remote.as_uri(), "main", "upstream")
+        toml = self.sb.root / "plugins" / "demo" / "plugin.toml"
+        toml.write_text(toml.read_text() + f'\n[targets.cc]\nbuild_repo = "{remote.as_uri()}"\npath = "plug2"\n')
+        (self.sb.root / "plugins" / "demo" / "cc").mkdir()
+        (self.sb.root / "plugins" / "demo" / "cc" / "port.py").write_text(
+            (self.sb.root / "plugins" / "demo" / "hermes" / "port.py").read_text())
+        build.sync(self.sb.root, "demo", "cc")
+        clone = self.sb.root / "builds" / "cc" / "demo"
+        self.assertEqual((clone / "a.txt").read_text(), "from plug2\n")
+        self.assertIn("path: plug2", (clone / "UPSTREAM").read_text())
+
     def test_unknown_target(self):
         with self.assertRaisesRegex(config.ConfigError, "no target 'codex'"):
             build.sync(self.sb.root, "demo", "codex")

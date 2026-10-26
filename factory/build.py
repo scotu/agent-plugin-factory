@@ -97,13 +97,14 @@ def sync(root: Path, name: str, target: str, ref: str | None = None) -> SyncResu
         raise config.ConfigError(f"plugin '{name}' has no target '{target}' (has: {', '.join(plugin.targets)})")
     here = plugin.dir / target
     port = load_hook(here)
-    ref = ref or plugin.ref
+    path, default_ref = plugin.source(target)
+    ref = ref or default_ref
     clone = clone_path(root, name, target)
 
     with tempfile.TemporaryDirectory() as tmp:
         src_repo = Path(tmp) / "upstream"
-        sha = upstream.fetch(plugin.repo, plugin.path, ref, src_repo)
-        src = src_repo / plugin.path if plugin.path else src_repo
+        sha = upstream.fetch(plugin.repo, path, ref, src_repo)
+        src = src_repo / path if path else src_repo
         prepare(clone, plugin.targets[target].build_repo)
         before = git(clone, "rev-parse", "HEAD")
         ctx = Context(name, target, here, sha, ref)
@@ -115,7 +116,7 @@ def sync(root: Path, name: str, target: str, ref: str | None = None) -> SyncResu
             port(src, clone, ctx)
             if not (clone / manifest).exists():
                 raise HookError(f"hook produced no {manifest}")
-            (clone / "UPSTREAM").write_text(f"repo: {plugin.repo}\npath: {plugin.path}\nref: {ref}\ncommit: {sha}\n")
+            (clone / "UPSTREAM").write_text(f"repo: {plugin.repo}\npath: {path}\nref: {ref}\ncommit: {sha}\n")
             (clone / "FACTORY").write_text(factory_stamp(root))
             label = f"{name} {ctx.version}" if ctx.version else name
             git(clone, "add", "-A")

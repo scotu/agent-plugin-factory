@@ -32,6 +32,15 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(plugin.dir, self.root / "plugins" / "demo")
         self.assertEqual(plugin.targets, {"hermes": Target("hermes", "git@github.com:me/demo-hermes.git", "demo")})
 
+    def test_target_overrides_path_and_ref(self):
+        (self.root / "plugins" / "demo" / "plugin.toml").write_text(
+            TOML + '[targets.cc]\nbuild_repo = "x"\npath = "/harness/p/cc/"\nref = "dev"\n')
+        self.assertEqual(load(self.root, "demo").source("cc"), ("harness/p/cc", "dev"))
+
+    def test_target_without_override_uses_upstream_path(self):
+        plugin = load(self.root, "demo")
+        self.assertEqual(plugin.source("hermes"), (plugin.path, plugin.ref))
+
     def test_defaults(self):
         (self.root / "plugins" / "demo" / "plugin.toml").write_text(
             '[upstream]\nrepo = "u"\n[targets.hermes]\nbuild_repo = "b"\n')

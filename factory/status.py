@@ -26,7 +26,8 @@ def lines(root: Path, names: list[str], profiles_dir: Path) -> list[str]:
             built_from = dict(l.split(": ", 1) for l in stamp.splitlines() if ": " in l).get("commit", "")
             try:
                 with tempfile.TemporaryDirectory() as tmp:
-                    ahead = str(upstream.count_ahead(plugin.repo, plugin.path, plugin.ref, built_from, Path(tmp) / "u"))
+                    path, ref = plugin.source(target)
+                    ahead = str(upstream.count_ahead(plugin.repo, path, ref, built_from, Path(tmp) / "u"))
             except GitError:
                 ahead = "?"
             text = git(clone, "show", f"refs/heads/main:{LEDGER}") \
@@ -34,6 +35,6 @@ def lines(root: Path, names: list[str], profiles_dir: Path) -> list[str]:
             active = sum(1 for e in ledger.parse(text) if e.status == "active")
             installs = ", ".join(f"{p}@{r[:7]}" for p, r in install.installed(profiles_dir, spec.plugin_key, clone))
             out.append(f"{head}: upstream {_short(clone, 'upstream')} (from {built_from[:12] or 'nothing yet'}, "
-                       f"{ahead} new upstream commits on {plugin.ref}), main {_short(clone, 'main')}, "
+                       f"{ahead} new upstream commits on {plugin.source(target)[1]}), main {_short(clone, 'main')}, "
                        f"{active} active customizations, installed: {installs or 'none'}")
     return out

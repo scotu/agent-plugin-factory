@@ -13,6 +13,8 @@ class Target:
     name: str
     build_repo: str
     plugin_key: str
+    path: str | None = None  # upstream subdir for this target, when it differs from [upstream] path
+    ref: str | None = None
 
 
 @dataclass(frozen=True)
@@ -24,6 +26,11 @@ class Plugin:
     ref: str
     targets: dict[str, Target]
 
+    def source(self, target: str) -> tuple[str, str]:
+        """The upstream (path, ref) this target builds from."""
+        t = self.targets[target]
+        return (self.path if t.path is None else t.path, t.ref or self.ref)
+
 
 def load(root: Path, name: str) -> Plugin:
     plugin_dir = root / "plugins" / name
@@ -33,7 +40,9 @@ def load(root: Path, name: str) -> Plugin:
     data = tomllib.loads(file.read_text())
     try:
         up = data["upstream"]
-        targets = {t: Target(t, v["build_repo"], v.get("plugin_key", name)) for t, v in data["targets"].items()}
+        targets = {t: Target(t, v["build_repo"], v.get("plugin_key", name),
+                             v["path"].strip("/") if "path" in v else None, v.get("ref"))
+                   for t, v in data["targets"].items()}
         return Plugin(name, plugin_dir, up["repo"], up.get("path", "").strip("/"), up.get("ref", "main"), targets)
     except KeyError as exc:
         raise ConfigError(f"{file}: missing {exc}") from None
