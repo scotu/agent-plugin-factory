@@ -17,7 +17,8 @@ Move every Hermes profile that installed pstack from the local build clone to th
    - Collect the findings: severity, file and line.
    - Sort them by whether the file changed since the installed rev: `git -C builds/hermes/pstack diff --quiet <rev> main -- <file>` exits 0 when it is unchanged. Read each new or changed flagged line.
    - Show the user every finding, with the changed or new ones first, and ask whether to force. Approval covers only this run.
-   - On yes, for each blocked profile, check whether pstack is enabled in `hermes -p <profile> plugins list`. Then run `hermes -p <profile> plugins install "file://$PWD/builds/hermes/pstack" --force --ref $(git -C builds/hermes/pstack rev-parse main)`, adding `--enable` if it was enabled and `--no-enable` if it was not. Use the same `file://` source so that `factory status` still tracks the profile.
+   - On yes, for each blocked profile, check whether pstack is enabled in `hermes -p <profile> plugins list`. Then run `hermes -p <profile> plugins install "file://$PWD/builds/hermes/pstack" --force`, adding `--enable` if it was enabled and `--no-enable` if it was not. Use the same `file://` source so that `factory status` still tracks the profile. Leave out `--ref`, because it pins the profile and `update` refuses a pinned plugin from then on.
+   - **A pinned profile** (`update` says `is pinned to <sha>`) keeps its pin through a reinstall. To unpin it: back up `config.yaml`, run `plugins remove pstack`, then install as above. Confirm afterwards that `config.yaml` is unchanged and that `.install-metadata.json` shows `"pinned": false`.
 5. **Verify.** Done when `python3 -m factory status pstack` shows every installed profile at `main`'s short SHA, and `hermes -p <profile> plugins list` shows the new version with its enabled state unchanged. Report:
    - each profile with its old and new rev and version
    - whether a scan block was overridden, and which findings were new
