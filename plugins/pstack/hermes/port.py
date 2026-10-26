@@ -1,12 +1,15 @@
 """Port upstream pstack (Cursor plugin) to a Hermes portable plugin (Agent Plugins v1).
 
-Upstream skill text is copied verbatim except for three mechanical edits:
+Upstream skill text is copied verbatim except for four mechanical edits:
   1. each SKILL.md `name:` is set to its directory name (Hermes requires it),
   2. a one-line pointer to the `pstack-on-hermes` skill is inserted after the frontmatter,
-  3. skills in EXCLUDE are dropped and overlay/skills/* are added or replace upstream.
+  3. skills in EXCLUDE are dropped and overlay/skills/* are added or replace upstream,
+  4. relative links to files the port drops (docs/, make-bot-ui, ...) point at upstream on GitHub, pinned to the
+     built commit, and links to the upstream README point at UPSTREAM-README.md.
 """
 import hashlib
 import json
+import os
 import re
 import shutil
 
@@ -20,6 +23,8 @@ NS = f"agent-plugin-{PLUGIN_KEY}-{hashlib.sha256(PLUGIN_KEY.encode()).hexdigest(
 POINTER = (f"> **On Hermes:** load `{NS}:pstack-on-hermes` with `skill_view` first and apply its "
            "substitutions (subagents, models, paths, missing Cursor features).\n\n")
 FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.S)
+UPSTREAM_BLOB = "https://github.com/cursor/plugins/blob/{sha}/pstack/{path}"
+LINK = re.compile(r"\]\(([^)\s#:]+)(#[^)]*)?\)")
 
 
 def patch_skill(skill_md, pointer):
@@ -30,6 +35,26 @@ def patch_skill(skill_md, pointer):
     fm = re.sub(r"^name:.*$", f"name: {skill_md.parent.name}", m.group(1), count=1, flags=re.M)
     body = text[m.end():].lstrip("\n").replace("{{NS}}", NS)
     skill_md.write_text(f"---\n{fm}\n---\n\n{pointer if pointer else ''}{body}")
+
+
+def relink(out, src, sha):
+    for md in (out / "skills").rglob("*.md"):
+        text = md.read_text()
+
+        def fix(m):
+            target, anchor = m.group(1), m.group(2) or ""
+            if (md.parent / target).exists():
+                return m.group(0)
+            rel = os.path.normpath(os.path.join(os.path.relpath(md.parent, out), target))
+            if rel == "README.md":
+                return f"]({os.path.relpath(out / 'UPSTREAM-README.md', md.parent)}{anchor})"
+            if (src / rel).exists():
+                return f"]({UPSTREAM_BLOB.format(sha=sha, path=rel)}{anchor})"
+            return m.group(0)  # dangling upstream too: left for tests/test_principles.py to flag
+
+        new = LINK.sub(fix, text)
+        if new != text:
+            md.write_text(new)
 
 
 def port(src, out, ctx):
@@ -57,6 +82,7 @@ def port(src, out, ctx):
 
     shutil.copy2(src / "LICENSE", out / "LICENSE")
     shutil.copy2(src / "README.md", out / "UPSTREAM-README.md")
+    relink(out, src, ctx.upstream_sha)
     (out / "plugin.json").write_text(json.dumps({
         "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
         "name": PLUGIN_KEY,
