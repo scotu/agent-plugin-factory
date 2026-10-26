@@ -44,7 +44,7 @@ Use this when Codex writes the code for a unit of work: a feature, a fix, or a c
 1. **Wait.** Wait for the Codex job to end, by its completion notification or `status --cwd <worktree> --json`.
 2. **Check scope.** Read the worktree's diff for scope only: files outside the brief, deleted tests, or debris. The wrapper doesn't rewrite code. It sends anything out of scope back to Codex.
 3. **Check and commit.** Run the repo's checks for the touched paths. Then commit what Codex wrote, with a message that names the Codex job, push, and open or update the PR with `gh pr create` or `gh pr edit`.
-4. **Fix rounds.** For each round (failed checks, review findings, bot comments), resume the same Codex job on the same worktree, with the finding and a red test where the playbook asks for one. Then go back to step 2.
+4. **Fix rounds.** For each round (failed checks, review findings, bot comments), resume the same Codex session on the same worktree with the finding, and a red test where the playbook asks for one. With the companion, run `task --resume-last --background --write --cwd <worktree> "<finding>"`. With the fallback, run `codex exec resume --last -C <worktree> "<finding>"`. Then go back to step 2.
 5. **Report.** Report the head SHA at each push, as the playbook asks of any owner.
 
 Judge progress by side effects, never by summaries: Codex's file changes, then the wrapper's commits and pushes.

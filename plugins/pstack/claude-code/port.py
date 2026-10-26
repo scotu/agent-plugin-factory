@@ -10,7 +10,10 @@ The upstream tree is already a Claude Code plugin, so the port is a copy plus fo
   4. relative links to files outside the tree point at upstream on GitHub pinned to the built commit, and links
      upstream already points at `main` are pinned too,
   5. upstream's README.md ships as UPSTREAM-README.md (the build repo's own README.md lives on `main`), and links
-     to it follow.
+     to it follow,
+  6. every SKILL.md gets upstream's one-line adapter pointer if it lacks one, agents/poteto-agent.md learns its
+     Claude Code path, the human-facing guide pages and UPSTREAM-README.md get a fork banner, worktree-audit.sh reads
+     Claude Code transcripts, and EXCLUDE plus the root plugin.json (which Claude Code ignores) are dropped.
 """
 import json
 import os
@@ -22,6 +25,24 @@ ADAPTER = "docs/harness/claude-code.md"
 UPSTREAM_BLOB = "https://github.com/cursor/plugins/blob/{sha}/harness/pstack/claude-code/{path}"
 MAIN_BLOB = re.compile(r"https://github\.com/cursor/plugins/blob/main/")
 LINK = re.compile(r"\]\(([^)\s#:]+)(#[^)]*)?\)")
+FRONTMATTER = re.compile(r"\A---\n.*?\n---\n", re.S)
+# make-bot-ui drives Cursor Automations (routines, webhooks), which Claude Code doesn't have.
+EXCLUDE = {"make-bot-ui"}
+POINTER = ("In Claude Code, read [the Claude Code adapter](../../docs/harness/claude-code.md) once per session before "
+           "you follow this skill. It maps the Cursor names in pstack skills to Claude Code.\n\n")
+AGENT_PATH = ("> **In Claude Code:** poteto-mode is at `${CLAUDE_PLUGIN_ROOT}/skills/poteto-mode/SKILL.md`. That is "
+              "the path to read; never search `~/.cursor/plugins/`.\n\n")
+BANNER = ("> **This is scotu/pstack-claude-code**, pstack built for Claude Code. Install it with "
+          "`claude plugin marketplace add scotu/pstack-claude-code` and `claude plugin install pstack@scotu-pstack`. "
+          "It runs lean by default (`skills/pstack-economy`): the panel and lane widths described here are the "
+          "go-wide forms, used when you approve them for a task. Cursor-only features map to Claude Code through "
+          "`docs/harness/claude-code.md`.\n\n")
+TRANSCRIPTS = (
+    "slug=$(printf '%s' \"$main_wt\" | sed 's#^/##; s#/#-#g')\n"
+    'transcripts="$HOME/.cursor/projects/$slug/agent-transcripts"',
+    "slug=$(printf '%s' \"$main_wt\" | sed 's#[/.]#-#g')\n"
+    'transcripts="$HOME/.claude/projects/$slug"',
+)
 
 
 def relink(out, src, sha):
@@ -54,13 +75,37 @@ def _manifest(path, ctx):
     return data
 
 
+def _after_frontmatter(path, text):
+    body = path.read_text()
+    m = FRONTMATTER.match(body)
+    end = m.end() if m else 0
+    path.write_text(body[:end] + ("\n" if m else "") + text + body[end:].lstrip("\n"))
+
+
 def port(src, out, ctx):
     shutil.copytree(src, out, dirs_exist_ok=True, ignore=shutil.ignore_patterns("node_modules", ".DS_Store"))
+    for name in EXCLUDE:
+        shutil.rmtree(out / "skills" / name, ignore_errors=True)
+    (out / "plugin.json").unlink(missing_ok=True)
     if (out / "README.md").exists():
         (out / "README.md").rename(out / "UPSTREAM-README.md")
     manifest = _manifest(out / ".claude-plugin" / "plugin.json", ctx)
-    if (out / "plugin.json").exists():
-        _manifest(out / "plugin.json", ctx)
+
+    for skill_md in (out / "skills").glob("*/SKILL.md"):
+        if "docs/harness/claude-code.md" not in skill_md.read_text():
+            _after_frontmatter(skill_md, POINTER)
+    agent = out / "agents" / "poteto-agent.md"
+    if agent.exists():
+        _after_frontmatter(agent, AGENT_PATH)
+    for page in [*sorted((out / "docs" / "guide").glob("*.md")), out / "UPSTREAM-README.md"]:
+        if page.exists():
+            page.write_text(BANNER + page.read_text())
+    audit = out / "skills" / "poteto-mode" / "scripts" / "worktree-audit.sh"
+    if audit.exists():
+        text = audit.read_text()
+        if TRANSCRIPTS[0] not in text:
+            raise RuntimeError("worktree-audit.sh no longer has the Cursor transcripts lookup; update TRANSCRIPTS")
+        audit.write_text(text.replace(TRANSCRIPTS[0], TRANSCRIPTS[1]))
     (out / ".claude-plugin" / "marketplace.json").write_text(json.dumps({
         "name": MARKETPLACE,
         "owner": {"name": "scotu"},

@@ -42,7 +42,6 @@ class PortTest(unittest.TestCase):
         manifest = self.run_port()
         self.assertNotIn("version", manifest)
         self.assertIn("(pstack 9.9.9, upstream aaaaaaa)", manifest["description"])
-        self.assertNotIn("version", json.loads((self.out / "plugin.json").read_text()))
         self.assertEqual(self.ctx.version, "9.9.9")
 
     def test_marketplace_lists_pstack_at_root(self):
@@ -75,7 +74,7 @@ class PortTest(unittest.TestCase):
         (self.src / "skills" / "a" / "SKILL.md").write_text("---\nname: a\n---\n[r](../../README.md#install)\n")
         self.run_port()
         self.assertFalse((self.out / "README.md").exists())
-        self.assertEqual((self.out / "UPSTREAM-README.md").read_text(), "upstream readme\n")
+        self.assertTrue((self.out / "UPSTREAM-README.md").read_text().endswith("upstream readme\n"))
         self.assertIn("(../../UPSTREAM-README.md#install)", (self.out / "skills" / "a" / "SKILL.md").read_text())
 
     def test_dropped_link_pinned(self):
@@ -95,6 +94,77 @@ class PortTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+AUDIT_SH = """# Transcripts dir: ~/.cursor/projects/<slugified-repo-path>/agent-transcripts.
+slug=$(printf '%s' "$main_wt" | sed 's#^/##; s#/#-#g')
+transcripts="$HOME/.cursor/projects/$slug/agent-transcripts"
+"""
+
+
+class PortTreeTest(PortTest):
+    """Port edits on the parts of the tree that the base fixture doesn't have."""
+
+    def add(self, rel, text):
+        path = self.src / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+
+    def test_every_skill_gets_adapter_pointer_once(self):
+        self.add("skills/b/SKILL.md", "---\nname: b\n---\n\n# B\n\nIn Claude Code, read [the Claude Code adapter]"
+                 "(../../docs/harness/claude-code.md) once per session before you follow this skill.\n")
+        self.run_port()
+        a = (self.out / "skills" / "a" / "SKILL.md").read_text()
+        self.assertTrue(a.startswith("---\nname: a\n---\n\nIn Claude Code, read [the Claude Code adapter]"
+                                     "(../../docs/harness/claude-code.md)"), a)
+        self.assertEqual((self.out / "skills" / "b" / "SKILL.md").read_text().count("Claude Code adapter"), 1)
+
+    def test_poteto_agent_gets_its_claude_code_path(self):
+        self.add("agents/poteto-agent.md", "---\nname: poteto-agent\n---\n\n# Poteto subagent\n\nsearch `~/.cursor/plugins/`\n")
+        self.run_port()
+        text = (self.out / "agents" / "poteto-agent.md").read_text()
+        self.assertIn("---\n\n> **In Claude Code:** poteto-mode is at `${CLAUDE_PLUGIN_ROOT}/skills/poteto-mode/SKILL.md`", text)
+        self.assertLess(text.index("${CLAUDE_PLUGIN_ROOT}"), text.index("~/.cursor/plugins/"))
+
+    def test_make_bot_ui_and_root_manifest_dropped(self):
+        self.add("skills/make-bot-ui/SKILL.md", "---\nname: make-bot-ui\n---\n")
+        self.run_port()
+        self.assertFalse((self.out / "skills" / "make-bot-ui").exists())
+        self.assertFalse((self.out / "plugin.json").exists())
+
+    def test_guide_pages_and_upstream_readme_get_fork_banner(self):
+        self.add("docs/guide/01-setup.md", "# Setup\n")
+        self.add("README.md", "# pstack\n")
+        self.run_port()
+        for rel in ("docs/guide/01-setup.md", "UPSTREAM-README.md"):
+            text = (self.out / rel).read_text()
+            self.assertTrue(text.startswith("> **This is scotu/pstack-claude-code"), rel)
+            self.assertIn("pstack-economy", text)
+            self.assertIn("claude plugin marketplace add scotu/pstack-claude-code", text)
+
+    def test_worktree_audit_reads_claude_transcripts(self):
+        self.add("skills/poteto-mode/scripts/worktree-audit.sh", AUDIT_SH)
+        self.run_port()
+        text = (self.out / "skills" / "poteto-mode" / "scripts" / "worktree-audit.sh").read_text()
+        self.assertIn('transcripts="$HOME/.claude/projects/$slug"', text)
+        self.assertIn("sed 's#[/.]#-#g'", text)
+        self.assertNotIn(".cursor/projects", text.split("\n", 1)[1])
+
+    def test_worktree_audit_patch_fails_loudly_when_upstream_moves(self):
+        self.add("skills/poteto-mode/scripts/worktree-audit.sh", "transcripts=elsewhere\n")
+        with self.assertRaisesRegex(RuntimeError, "worktree-audit.sh"):
+            self.run_port()
+
+    def test_adapter_rows_for_audit_findings(self):
+        self.run_port()
+        text = (self.out / "docs" / "harness" / "claude-code.md").read_text()
+        for name in ("agent's store", "`git show origin/main:pstack/<path>`", "Cursor restart", "cloud VM",
+                     "pinned", "`mcps/`", "image-generation", "inline", "Custom Mode", "Cursor Project",
+                     "`/in-cloud`", "`/add-plugin`", "`allow_multiple: true`", "first `type: user` record"):
+            self.assertIn(name, text)
+        codex = text.split("## Codex", 1)[1]
+        self.assertIn("overrides the Models row", codex)
+        self.assertIn("inherit-parent", codex)
 
 
 SKILL = HERE / "overlay" / "skills" / "pstack-codex" / "SKILL.md"
@@ -127,6 +197,11 @@ class CodexSkillTest(unittest.TestCase):
         for needle in ("workspace-write", "git worktree add", "commits", "push", "gh pr create", "--cwd"):
             self.assertIn(needle, owner)
         self.assertIn("does not commit, push, or reach the network", section("Limits"))
+
+    def test_resume_command_named(self):
+        text = section("Wrapper loop")
+        self.assertIn("--resume-last", text)
+        self.assertIn("codex exec resume", text)
 
     def test_advisory_is_read_only(self):
         text = section("Advisory seat")

@@ -1,6 +1,6 @@
 ## Codex
 
-When Codex is available, it is pstack's second model family in Claude Code. Load the `pstack-codex` skill (`/pstack:pstack-codex`) for how to run a Codex agent.
+When Codex is available, it is pstack's second model family in Claude Code. Read `<pstack>/skills/pstack-codex/SKILL.md` for how to run a Codex agent. When Codex is available, this table overrides the Models row for non-Claude slugs. It also overrides the setup-pstack Defaults bullet that writes `grok-4.7-xhigh-fast` as `inherit-parent`: with Codex available, write `codex <model> <effort>` with a Codex model the user confirmed. `inherit-parent` stays the mapping only without Codex.
 
 | Cursor | Claude Code |
 | --- | --- |
