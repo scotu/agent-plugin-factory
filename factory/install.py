@@ -19,8 +19,18 @@ def installed(profiles_dir: Path, plugin_key: str, clone: Path) -> list[tuple[st
 
 
 def claude_code_installed(plugins_json: Path, plugin_id: str) -> list[tuple[str, str]]:
-    """(scope, gitCommitSha) for each Claude Code install of `<plugin>@<marketplace>`."""
-    if not plugins_json.exists():
-        return []
-    entries = json.loads(plugins_json.read_text()).get("plugins", {}).get(plugin_id, [])
-    return [(str(e.get("scope", "")), str(e.get("gitCommitSha", ""))) for e in entries if isinstance(e, dict)]
+    """(scope, gitCommitSha) for each Claude Code install of `<plugin>@<marketplace>`. A plugin that settings enable
+    (enabledPlugins + extraKnownMarketplaces) has no install record, so fall back to the live cache folder
+    `cache/<marketplace>/<plugin>/<version>/`, whose name is the commit when the manifest has no version."""
+    try:
+        records = json.loads(plugins_json.read_text()).get("plugins", {}) if plugins_json.exists() else {}
+    except ValueError:
+        records = {}
+    entries = records.get(plugin_id, []) if isinstance(records, dict) else []
+    found = [(str(e.get("scope", "")), str(e.get("gitCommitSha", ""))) for e in entries if isinstance(e, dict)]
+    if found:
+        return found
+    name, _, marketplace = plugin_id.partition("@")
+    cache = plugins_json.parent / "cache" / marketplace / name
+    live = [d for d in cache.iterdir() if d.is_dir() and not (d / ".orphaned_at").exists()] if cache.is_dir() else []
+    return [("cache", max(live, key=lambda d: d.stat().st_mtime).name)] if live else []
