@@ -36,7 +36,7 @@ Use this when Codex writes the code for a unit of work: a feature, a fix, or a c
 2. It starts Codex in that worktree, in the background and able to write: companion `task --background --write --cwd <worktree>`, or `codex exec -C <worktree> -s workspace-write`. Codex edits files only. Under `workspace-write`, the network is off and git metadata is out of reach, and that is intended.
 3. It records the pair in the program dir's `owners.tsv` (see `pstack-economy`, Audit tick):
    - `executor` is `codex`;
-   - `job` is the Codex job id and the wrapper's agent id, separated by `+`;
+   - `job` is the Codex job id and the wrapper's agent id, separated by `+`. Under the `codex exec` fallback there is no job id: record the session id from `exec`'s `--json` output in its place. The watcher can't query it and shows `codex=-`, so a fallback pair is surfaced only when it goes STUCK;
    - plus the worktree branch and expected minutes.
 
    The wrapper commits, pushes and opens the PR (`gh pr create`). Codex never does.
@@ -46,7 +46,11 @@ Use this when Codex writes the code for a unit of work: a feature, a fix, or a c
 1. **Wait.** Wait for the Codex job to end, by its completion notification or `status --cwd <worktree> --json`.
 2. **Check scope.** Read the worktree's diff for scope only: files outside the brief, deleted tests, or debris. The wrapper doesn't rewrite code. It sends anything out of scope back to Codex.
 3. **Check and commit.** Run the repo's checks for the touched paths. Then commit what Codex wrote, with a message that names the Codex job, push, and open or update the PR with `gh pr create` or `gh pr edit`.
-4. **Fix rounds.** For each round (failed checks, review findings, bot comments), resume the same Codex session on the same worktree with the finding, and a red test where the playbook asks for one. With the companion, run `task --resume-last --background --write --cwd <worktree> "<finding>"`. With the fallback, run `codex exec resume --last -C <worktree> "<finding>"`. Then go back to step 2.
+4. **Fix rounds.** For each round (failed checks, review findings, bot comments), resume the same Codex session on the same worktree with the finding, and a red test where the playbook asks for one.
+   - **With the companion,** run `task --resume-last --background --write --cwd <worktree> "<finding>"`.
+   - **With the fallback,** run, from inside the worktree, `codex exec resume <session id> -c sandbox_mode="workspace-write" --json "<finding>"`. `resume` accepts neither `-C` nor `-s`. Name the session id rather than `--last`, because other pairs run sessions in parallel.
+
+   Each round is a new Codex job, so update the `job` column in `owners.tsv` with its id. Then go back to step 2.
 5. **Report.** Report the head SHA at each push, as the playbook asks of any owner.
 
 Judge progress by side effects, never by summaries: Codex's file changes, then the wrapper's commits and pushes.

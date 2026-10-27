@@ -204,7 +204,16 @@ class CodexSkillTest(unittest.TestCase):
     def test_resume_command_named(self):
         text = section("Wrapper loop")
         self.assertIn("--resume-last", text)
-        self.assertIn("codex exec resume", text)
+        self.assertIn("codex exec resume <session id>", text)
+        self.assertIn('-c sandbox_mode="workspace-write"', text)
+        self.assertNotIn("resume --last", text)
+
+    def test_each_round_records_its_job(self):
+        self.assertIn("update the `job` column", section("Wrapper loop"))
+
+    def test_fallback_pairs_rely_on_stuck(self):
+        self.assertIn("session id", section("Code-writing owner"))
+        self.assertIn("STUCK", section("Code-writing owner"))
 
     def test_advisory_is_read_only(self):
         text = section("Advisory seat")
