@@ -30,6 +30,8 @@ Codex sees only the brief you give it. Put the whole task in it: the goal, the f
 
 Use this for a reviewer, judge, verifier, explorer, or any seat that only reads. Run Codex without `--write`, through the companion's `task` or `codex exec -s read-only`, from the repository or worktree being judged. Read its result directly. An advisory seat never edits files, and nobody commits on its behalf.
 
+A **probe seat** is an advisory seat that must prove its findings with a run, such as an interrogate adversary or a verifier that writes a repro test. Give it its own throwaway worktree (`git worktree add --detach <probe worktree> <head>`), copy in any uncommitted changes in scope, and run the companion's `task --write --cwd <probe worktree>` or `codex exec -C <probe worktree> -s workspace-write`. It edits only that worktree, and nobody commits from it. Read its findings from the result, rerun each command yourself as the calling skill says, and remove the worktree when the skill is done.
+
 ## Code-writing owner
 
 Use this when Codex writes the code for a unit of work: a feature, a fix, or a candidate in a race. A Codex job is paired with a **wrapper**, which is an `Agent` subagent on a light Claude model. The pair is the branch's one writer.

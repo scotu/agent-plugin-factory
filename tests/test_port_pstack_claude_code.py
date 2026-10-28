@@ -226,6 +226,17 @@ class CodexSkillTest(unittest.TestCase):
         self.assertIn("-c model_reasoning_effort=max", text)
         self.assertIn("`ultra`", text)
 
+    def test_probe_seat_writes_only_a_throwaway_worktree(self):
+        text = section("Advisory seat")
+        self.assertIn("throwaway worktree", text)
+        self.assertIn("--write --cwd <probe worktree>", text)
+        self.assertIn("nobody commits", text)
+
+    def test_adapter_maps_orchestrate_tracking(self):
+        text = (HERE / "overlay" / "adapter-more.md").read_text()
+        self.assertIn("Project tracker (`notes.md`)", text)
+        self.assertIn("PR and CI event subscriptions", text)
+
     def test_advisory_is_read_only(self):
         text = section("Advisory seat")
         self.assertIn("without `--write`", text)

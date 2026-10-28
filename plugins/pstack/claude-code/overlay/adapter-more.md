@@ -26,6 +26,8 @@ Upstream's tables above leave these out.
 | The image-generation tool, a generated image | Not available. Draw a Mermaid or ASCII diagram, and say the picture was skipped. |
 | Embedding a screenshot or video inline in the reply | Give its absolute path, or an Artifact link when the session offers one. |
 | A Custom Mode, "Use as Mode", Option+Enter, the Agents Window, Plan Mode | Not available. Start each task with `/pstack:poteto-mode`. For planning, use the Multi-phase plan playbook. |
+| The Project tracker (`notes.md`) and the Project store | `notes.md` and the files beside it in the program dir, `~/.claude/pstack-programs/<program>/`. |
+| PR and CI event subscriptions | The background watcher from `pstack-economy`'s Audit tick. It exits when a head moves, checks change, or a bot comments, and costs nothing while nothing changes. List each PR in `owners.tsv`. |
 | A Cursor Project (one persistent coordinator thread) | One long-lived Claude Code session per program, with worktree subagents. |
 | `/in-cloud` | `isolation: "worktree"` on the `Agent` call. |
 | `/add-plugin pstack`, Customize in the sidebar, `/plugin marketplace add cursor/plugins` | `claude plugin marketplace add scotu/pstack-claude-code`, then `claude plugin install pstack@scotu-pstack`. This fork, not upstream's marketplace. |
