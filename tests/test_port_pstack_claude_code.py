@@ -215,6 +215,17 @@ class CodexSkillTest(unittest.TestCase):
         self.assertIn("session id", section("Code-writing owner"))
         self.assertIn("STUCK", section("Code-writing owner"))
 
+    def test_wrapper_waits_with_one_blocking_call(self):
+        text = section("Wrapper loop")
+        self.assertIn("status <job> --wait --timeout-ms 540000", text)
+        self.assertIn("waitTimedOut", text)
+        self.assertNotIn("sleep", text)
+
+    def test_max_effort_runs_through_exec(self):
+        text = section("Available")
+        self.assertIn("-c model_reasoning_effort=max", text)
+        self.assertIn("`ultra`", text)
+
     def test_advisory_is_read_only(self):
         text = section("Advisory seat")
         self.assertIn("without `--write`", text)

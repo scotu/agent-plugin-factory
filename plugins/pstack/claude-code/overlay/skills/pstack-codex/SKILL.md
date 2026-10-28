@@ -22,6 +22,8 @@ When Codex is not available, run the seat on Claude as the adapter's Models tabl
 
 A role value `codex <model> <effort>` names the model. `codex default <effort>` means Codex's own configured model: pass no `--model` or `-m`, only the effort.
 
+The companion takes efforts up to `xhigh`. Run a `max` seat through `codex exec` with `-c model_reasoning_effort=max`, and only on a model whose `supported_reasoning_levels` in `~/.codex/models_cache.json` lists `max`. `ultra` adds Codex's own delegation, and a Codex seat is a leaf (see Limits), so pstack runs at most `max`.
+
 Codex sees only the brief you give it. Put the whole task in it: the goal, the files and paths in scope, the checks to run, and the shape of the answer you expect.
 
 ## Advisory seat
@@ -43,7 +45,9 @@ Use this when Codex writes the code for a unit of work: a feature, a fix, or a c
 
 ## Wrapper loop
 
-1. **Wait.** Wait for the Codex job to end, by its completion notification or `status --cwd <worktree> --json`.
+1. **Wait.** Wait for the Codex job to end with one blocking call at a time, which costs no model turns while Codex works.
+   - **With the companion,** run `status <job> --wait --timeout-ms 540000 --cwd <worktree> --json` as a single Bash call with a 600000 ms timeout. When its JSON has `waitTimedOut: true`, run the same call again.
+   - **With the fallback,** the background `codex exec` call notifies you when it exits. Act on that notification.
 2. **Check scope.** Read the worktree's diff for scope only: files outside the brief, deleted tests, or debris. The wrapper doesn't rewrite code. It sends anything out of scope back to Codex.
 3. **Check and commit.** Run the repo's checks for the touched paths. Then commit what Codex wrote, with a message that names the Codex job, push, and open or update the PR with `gh pr create` or `gh pr edit`.
 4. **Fix rounds.** For each round (failed checks, review findings, bot comments), resume the same Codex session on the same worktree with the finding, and a red test where the playbook asks for one.
